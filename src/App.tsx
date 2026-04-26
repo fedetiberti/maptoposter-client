@@ -12,6 +12,7 @@ import { PosterFrame } from '@/features/poster/ui/PosterFrame'
 import { FontPicker } from '@/features/typography/ui/FontPicker'
 import { MarkerEditor } from '@/features/markers/ui/MarkerEditor'
 import { GpxImportButton } from '@/features/gpx/ui/GpxImportButton'
+import { ExportPanel } from '@/features/export/ui/ExportPanel'
 
 export default function App() {
   return (
@@ -27,6 +28,8 @@ export default function App() {
         </header>
 
         <aside className="pointer-events-auto absolute right-3 top-3 z-30 flex max-h-[calc(100vh-120px)] w-[360px] flex-col gap-4 overflow-y-auto rounded-xl border border-border/60 bg-card/70 p-4 shadow-2xl backdrop-blur-2xl">
+          <ExportPanel />
+          <hr className="border-border/30" />
           <LocationPanel />
           <hr className="border-border/30" />
           <LayoutPicker />
