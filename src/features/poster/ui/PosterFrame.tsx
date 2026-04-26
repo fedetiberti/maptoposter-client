@@ -1,14 +1,16 @@
 import { useRef } from 'react'
 import { findLayout, LAYOUTS } from '@/data/layouts'
 import { aspectRatio } from '@/features/layout/domain/Layout'
-import { computePreviewBox } from '@/features/layout/application/computePreviewBox'
+import {
+  computePreviewBox,
+  POSTER_MARGIN_PX,
+  POSTER_RIGHT_DOCK_PX,
+} from '@/features/layout/application/computePreviewBox'
 import { useResizeObserver } from '@/shared/hooks/useResizeObserver'
 import { usePosterState } from '@/features/poster/application/PosterContext'
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { TitleBlock } from '@/features/poster/ui/TitleBlock'
-
-const RIGHT_DOCK_PX = 380
 
 /**
  * Bordered, aspect-ratio'd preview overlay. Sits on top of the live MapLibre
@@ -39,8 +41,8 @@ export function PosterFrame() {
 
   const previewBox = size
     ? computePreviewBox(size, ratio, {
-        marginPx: 56,
-        rightDockPx: RIGHT_DOCK_PX,
+        marginPx: POSTER_MARGIN_PX,
+        rightDockPx: POSTER_RIGHT_DOCK_PX,
       })
     : null
 

@@ -1,9 +1,9 @@
 import { findLayout, LAYOUTS } from '@/data/layouts'
-import { exportSize } from '@/features/layout/domain/Layout'
+import { exportSize, aspectRatio } from '@/features/layout/domain/Layout'
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { buildMapStyle } from '@/features/theme/application/mapStyleSpec'
-import type { ExportFormat, PosterState } from '@/features/poster/domain/PosterState'
+import type { ExportFormat, PosterState, MapView } from '@/features/poster/domain/PosterState'
 import { renderSinglePass } from '@/features/export/application/singlePass'
 import { compositeOverlay } from '@/features/export/application/compositeOverlay'
 import { encodePng } from '@/features/export/infrastructure/png/encodePng'
@@ -12,6 +12,15 @@ import { encodeSvg } from '@/features/export/infrastructure/svg/encodeSvg'
 import { downloadBlob } from '@/shared/utils/downloadBlob'
 import { services } from '@/core/services'
 import { renderTiled } from '@/features/export/application/tileRender'
+import {
+  computePreviewBox,
+  POSTER_MARGIN_PX,
+  POSTER_RIGHT_DOCK_PX,
+} from '@/features/layout/application/computePreviewBox'
+import {
+  lonLatToWorldPx,
+  worldPxToLonLat,
+} from '@/features/export/application/projection'
 
 export const SINGLE_PASS_MAX_SIDE = 8192
 export const TILED_MAX_SIDE = 16384
@@ -109,13 +118,25 @@ export async function runExport(
     tilesBaseUrl: services.config.tilesBaseUrl,
   })
 
-  // Compute the zoom for the offscreen render so the geographic content
-  // matches what the live preview shows. We assume the export aspect ratio
-  // matches the preview frame's aspect (the layout picker enforces this).
-  const exportAspect = size.widthPx / size.heightPx
-  const livePxRef = exportAspect >= 1 ? req.liveViewportWidth : req.liveViewportHeight
-  const exportPxRef = exportAspect >= 1 ? size.widthPx : size.heightPx
-  const exportZoom = state.view.zoom + Math.log2(exportPxRef / Math.max(1, livePxRef))
+  // Match exactly what the live preview's poster frame shows.
+  //
+  // The right-edge dock pushes the frame off-center horizontally, so the
+  // geographic point at the frame's center is NOT state.view.lat/lon (which
+  // tracks the window center). Compute the frame's geographic center by
+  // projecting the on-screen pixel offset through web mercator at the
+  // current zoom. Then choose an exportZoom such that the export's pixel
+  // box covers the same geographic extent as the frame's pixel box.
+  const exportView = computeFrameProjection({
+    state,
+    viewportWidth: req.liveViewportWidth,
+    viewportHeight: req.liveViewportHeight,
+    exportWidthPx: size.widthPx,
+    exportHeightPx: size.heightPx,
+    layoutAspect:
+      state.layout.kind === 'preset'
+        ? aspectRatio(findLayout(state.layout.presetId) ?? LAYOUTS[3]!)
+        : state.layout.widthPx / state.layout.heightPx,
+  })
 
   onProgress({ stage: 'rendering', percent: 15 })
 
@@ -123,10 +144,10 @@ export async function runExport(
   const result = useTiled
     ? await renderTiled({
         styleSpec,
-        view: state.view,
+        view: exportView.view,
         widthPx: size.widthPx,
         heightPx: size.heightPx,
-        exportZoom,
+        exportZoom: exportView.zoom,
         onTileProgress: (done, total) =>
           onProgress({
             stage: 'rendering',
@@ -136,10 +157,10 @@ export async function runExport(
       })
     : await renderSinglePass({
         styleSpec,
-        view: state.view,
+        view: exportView.view,
         widthPx: size.widthPx,
         heightPx: size.heightPx,
-        exportZoom,
+        exportZoom: exportView.zoom,
       })
 
   onProgress({ stage: 'compositing', percent: 80 })
@@ -176,4 +197,64 @@ export async function runExport(
   onProgress({ stage: 'downloading', percent: 98 })
   downloadBlob(blob, fileNameFor(state, format, size))
   onProgress({ stage: 'done', percent: 100 })
+}
+
+interface FrameProjectionInput {
+  state: PosterState
+  viewportWidth: number
+  viewportHeight: number
+  exportWidthPx: number
+  exportHeightPx: number
+  layoutAspect: number
+}
+
+/**
+ * Pure function: derives the geographic center + zoom that makes the export
+ * canvas show the same content as the live preview frame.
+ */
+function computeFrameProjection(input: FrameProjectionInput): {
+  view: MapView
+  zoom: number
+} {
+  const previewBox = computePreviewBox(
+    { width: input.viewportWidth, height: input.viewportHeight },
+    input.layoutAspect,
+    {
+      marginPx: POSTER_MARGIN_PX,
+      rightDockPx: POSTER_RIGHT_DOCK_PX,
+    },
+  )
+  // Frame center (in screen pixels) and its offset from the window center.
+  const frameCenterX = previewBox.x + previewBox.width / 2
+  const frameCenterY = previewBox.y + previewBox.height / 2
+  const offsetX = frameCenterX - input.viewportWidth / 2
+  const offsetY = frameCenterY - input.viewportHeight / 2
+
+  // At the current zoom, 1 world-px = 1 screen-px, so the offset translates
+  // directly into a world-pixel shift. Convert back to lon/lat.
+  const stateView = input.state.view
+  const stateWorld = lonLatToWorldPx(stateView.lon, stateView.lat, stateView.zoom)
+  const frameWorld = {
+    x: stateWorld.x + offsetX,
+    y: stateWorld.y + offsetY,
+  }
+  const frameLonLat = worldPxToLonLat(frameWorld.x, frameWorld.y, stateView.zoom)
+
+  // Zoom that makes the export pixel box cover the same geographic extent
+  // as the preview pixel box. Pick the dimension that constrains scale on
+  // both axes equally (aspect ratios match by construction, so either works).
+  const exportAspect = input.exportWidthPx / input.exportHeightPx
+  const exportPxRef = exportAspect >= 1 ? input.exportWidthPx : input.exportHeightPx
+  const previewPxRef = exportAspect >= 1 ? previewBox.width : previewBox.height
+  const zoom =
+    stateView.zoom + Math.log2(exportPxRef / Math.max(1, previewPxRef))
+
+  return {
+    view: {
+      ...stateView,
+      lat: frameLonLat.lat,
+      lon: frameLonLat.lon,
+    },
+    zoom,
+  }
 }

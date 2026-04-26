@@ -1,7 +1,13 @@
 /**
  * Fits a layout's aspect ratio into the viewport with a configurable margin,
  * returning the on-screen rect of the poster preview frame.
+ *
+ * Constants are shared with PosterFrame.tsx and exportPipeline.ts so that
+ * (live preview frame) and (export geographic content) stay in sync.
  */
+export const POSTER_MARGIN_PX = 56
+export const POSTER_RIGHT_DOCK_PX = 380
+
 export interface ViewportRect {
   width: number
   height: number
