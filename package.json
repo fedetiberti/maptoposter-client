@@ -22,6 +22,7 @@
     "@fontsource/raleway": "^5.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dompurify": "^3.4.1",
     "lucide-react": "^1.11.0",
     "maplibre-gl": "^5.24.0",
     "react": "^19.2.5",

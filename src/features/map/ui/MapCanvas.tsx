@@ -9,6 +9,7 @@ import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { buildMapStyle } from '@/features/theme/application/mapStyleSpec'
 import { services } from '@/core/services'
+import { MarkerOverlay } from '@/features/markers/application/MarkerOverlay'
 
 export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -53,5 +54,10 @@ export function MapCanvas() {
     engineRef.current?.setView(state.view)
   }, [state.view])
 
-  return <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+  return (
+    <>
+      <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+      <MarkerOverlay engine={engine} />
+    </>
+  )
 }
