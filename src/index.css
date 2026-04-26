@@ -6,25 +6,34 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 18%);
-  --ring: oklch(0.556 0 0);
-  --radius: 0.625rem;
+  /* Cartographer's Console — deep ink with brass instrument glow */
+  --background: oklch(0.135 0.012 252);
+  --foreground: oklch(0.97 0.005 90);
+  --card: oklch(0.185 0.012 250);
+  --card-foreground: oklch(0.97 0.005 90);
+  --popover: oklch(0.165 0.012 250);
+  --popover-foreground: oklch(0.97 0.005 90);
+  --primary: oklch(0.83 0.16 75);          /* brass accent */
+  --primary-foreground: oklch(0.18 0.02 60);
+  --secondary: oklch(0.24 0.012 250);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.22 0.012 250);
+  --muted-foreground: oklch(0.62 0.02 90);
+  --accent: oklch(0.83 0.16 75);
+  --accent-foreground: oklch(0.18 0.02 60);
+  --destructive: oklch(0.66 0.21 28);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.83 0.16 75 / 60%);
+  --radius: 0.5rem;
+
+  /* Bespoke tokens for the Cartographer's Console aesthetic */
+  --ink-deepest: oklch(0.10 0.012 250);
+  --rule: oklch(1 0 0 / 7%);
+  --rule-strong: oklch(1 0 0 / 14%);
+  --brass: oklch(0.83 0.16 75);
+  --brass-dim: oklch(0.78 0.13 75 / 50%);
+  --copper: oklch(0.72 0.13 50);
 }
 
 @theme inline {
@@ -53,7 +62,12 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-brass: var(--brass);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-ink-deepest: var(--ink-deepest);
 }
 
 @layer base {
@@ -67,9 +81,77 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
-    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1, "cv11" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Atelier hairline — used as section separators in the dock */
+  .hairline {
+    height: 1px;
+    background:
+      linear-gradient(
+        to right,
+        transparent 0%,
+        var(--rule-strong) 12%,
+        var(--rule-strong) 88%,
+        transparent 100%
+      );
+  }
+
+  .glass {
+    background-color: color-mix(in oklab, var(--card) 72%, transparent);
+    border: 1px solid var(--rule);
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    box-shadow:
+      0 1px 0 0 oklch(1 0 0 / 5%) inset,
+      0 24px 48px -12px oklch(0 0 0 / 60%);
+  }
+
+  .grid-grain {
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 2%) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 2%) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Section label — small caps mono with measured tracking */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* Numerical readout — instrument feel */
+  .readout {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1, "zero" 1;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
+  /* Brass focus ring */
+  .focus-brass:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 1px;
+  }
+
+  /* Slide-in animation for dock panel */
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateX(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  .anim-panel-in {
+    animation: panel-in 220ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 }
