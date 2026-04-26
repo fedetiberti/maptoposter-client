@@ -68,18 +68,20 @@ export function PosterFrame() {
             overflow: 'hidden',
           }}
         >
+          {/* Top + bottom gradient fades — let the map show through edge-to-edge,
+              fading into the theme bg color so the title block stays readable. */}
           <div
-            className="absolute inset-x-0 top-0"
+            className="pointer-events-none absolute inset-x-0 top-0"
             style={{
-              height: '84.5%',
-              borderBottom: `1px solid color-mix(in oklab, ${colors['ui.text']} 12%, transparent)`,
+              height: '12%',
+              background: `linear-gradient(to bottom, ${colors['ui.bg']} 0%, transparent 100%)`,
             }}
           />
           <div
-            className="absolute inset-x-0 bottom-0"
+            className="pointer-events-none absolute inset-x-0 bottom-0"
             style={{
-              height: '15.5%',
-              background: colors['ui.bg'],
+              height: '32%',
+              background: `linear-gradient(to top, ${colors['ui.bg']} 0%, ${colors['ui.bg']} 28%, transparent 100%)`,
             }}
           />
           <TitleBlock width={previewBox.width} height={previewBox.height} />

@@ -11,6 +11,7 @@ export interface FontDef {
 }
 
 const BUNDLED: FontDef[] = [
+  { id: 'roboto', cssFamily: 'Roboto', source: 'bundled', weights: [300, 400, 700], category: 'sans' },
   { id: 'inter', cssFamily: 'Inter Variable', source: 'bundled', weights: [400, 600, 700], category: 'sans' },
   { id: 'bebas-neue', cssFamily: 'Bebas Neue', source: 'bundled', weights: [400], category: 'display' },
   { id: 'oswald', cssFamily: 'Oswald', source: 'bundled', weights: [500, 700], category: 'display' },

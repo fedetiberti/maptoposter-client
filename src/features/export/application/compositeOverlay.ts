@@ -9,14 +9,18 @@ import type {
 import type { ThemeColors } from '@/features/theme/domain/Theme'
 import type { GpxState } from '@/features/poster/domain/PosterState'
 import { findFont } from '@/data/fonts'
+import { hexToRgb } from '@/shared/utils/color'
 
 interface CompositeOpts {
   canvas: HTMLCanvasElement
   proj: ExportProjection
   state: PosterState
   themeColors: ThemeColors
-  /** Height (in px) of the bottom title strip, derived from layout aspect. */
-  titleStripHeightRatio?: number
+}
+
+function rgbaWithAlpha(hex: string, alpha: number): string {
+  const [r, g, b] = hexToRgb(hex)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 /**
@@ -28,7 +32,6 @@ export async function compositeOverlay({
   proj,
   state,
   themeColors,
-  titleStripHeightRatio = 0.155,
 }: CompositeOpts): Promise<void> {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('2D context unavailable')
@@ -44,16 +47,41 @@ export async function compositeOverlay({
     await drawMarker(ctx, m, proj)
   }
 
-  // ── 3. Bottom title strip background ───────────────────────────────────
-  const stripH = Math.round(H * titleStripHeightRatio)
-  const stripY = H - stripH
-  ctx.save()
-  ctx.fillStyle = themeColors['ui.bg']
-  ctx.fillRect(0, stripY, W, stripH)
-  ctx.restore()
+  // ── 3. Top + bottom gradient fades ─────────────────────────────────────
+  // Mirrors the original maptoposter behavior: map shows through edge-to-edge,
+  // fades into theme bg so the title block (and a subtle top strip) reads cleanly.
+  drawFades(ctx, themeColors['ui.bg'], W, H)
 
   // ── 4. Title block text ────────────────────────────────────────────────
   drawTitleBlock(ctx, state, themeColors, W, H)
+}
+
+function drawFades(
+  ctx: CanvasRenderingContext2D,
+  bgHex: string,
+  W: number,
+  H: number,
+): void {
+  // Top fade: small, decorative.
+  const topH = Math.round(H * 0.12)
+  const topGrad = ctx.createLinearGradient(0, 0, 0, topH)
+  topGrad.addColorStop(0, bgHex)
+  topGrad.addColorStop(1, rgbaWithAlpha(bgHex, 0))
+  ctx.save()
+  ctx.fillStyle = topGrad
+  ctx.fillRect(0, 0, W, topH)
+  ctx.restore()
+
+  // Bottom fade: larger, opaque-by-the-bottom so text reads cleanly.
+  const botStartY = Math.round(H * 0.68)
+  const botGrad = ctx.createLinearGradient(0, botStartY, 0, H)
+  botGrad.addColorStop(0, rgbaWithAlpha(bgHex, 0))
+  botGrad.addColorStop(0.72, bgHex)
+  botGrad.addColorStop(1, bgHex)
+  ctx.save()
+  ctx.fillStyle = botGrad
+  ctx.fillRect(0, botStartY, W, H - botStartY)
+  ctx.restore()
 }
 
 function drawGpx(
@@ -145,7 +173,7 @@ function drawTitleBlock(
 
   // Country
   if (country) {
-    ctx.font = `400 ${fontSizes.country}px ${familyChain}`
+    ctx.font = `300 ${fontSizes.country}px ${familyChain}`
     ;(ctx as CtxWithLetterSpacing).letterSpacing = `${0.32 * fontSizes.country}px`
     ctx.globalAlpha = 0.85
     ctx.fillText(country, W / 2, H * 0.905)

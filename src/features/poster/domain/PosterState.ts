@@ -167,7 +167,7 @@ export const DEFAULT_POSTER_STATE: PosterState = {
     showCoordinates: true,
   },
   font: {
-    id: 'bebas-neue',
+    id: 'roboto',
     googleFamily: null,
     weight: 700,
   },

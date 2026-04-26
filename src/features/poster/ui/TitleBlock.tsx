@@ -88,7 +88,7 @@ export function TitleBlock({ width, height, exportWidthPx }: TitleBlockProps) {
           fontFamily,
           fontSize: `${countryFontPx}px`,
           letterSpacing: '0.32em',
-          fontWeight: 400,
+          fontWeight: 300,
           opacity: 0.85,
           whiteSpace: 'nowrap',
         }}
