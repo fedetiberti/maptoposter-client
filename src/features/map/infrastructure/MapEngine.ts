@@ -1,10 +1,11 @@
 import maplibregl from 'maplibre-gl'
+import type { StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { MapView } from '@/features/poster/domain/PosterState'
 
 export interface MapEngineOptions {
   container: HTMLElement
-  styleUrl: string
+  initialStyle: string | StyleSpecification
   view: MapView
   onCameraChange: (view: MapView) => void
 }
@@ -18,7 +19,7 @@ export class MapEngine {
     this.onCameraChange = opts.onCameraChange
     this.map = new maplibregl.Map({
       container: opts.container,
-      style: opts.styleUrl,
+      style: opts.initialStyle,
       center: [opts.view.lon, opts.view.lat],
       zoom: opts.view.zoom,
       bearing: opts.view.bearing,
@@ -77,8 +78,24 @@ export class MapEngine {
     })
   }
 
-  setStyle(styleUrl: string): void {
-    this.map.setStyle(styleUrl, { diff: false })
+  setStyle(style: string | StyleSpecification, opts?: { diff?: boolean }): void {
+    this.map.setStyle(style, { diff: opts?.diff ?? true })
+  }
+
+  isReady(): boolean {
+    return Boolean(this.map.loaded() && this.map.isStyleLoaded())
+  }
+
+  onceStyleLoaded(callback: () => void): void {
+    if (this.map.isStyleLoaded()) {
+      callback()
+      return
+    }
+    const handler = () => {
+      this.map.off('styledata', handler)
+      callback()
+    }
+    this.map.on('styledata', handler)
   }
 
   getMap(): maplibregl.Map {
