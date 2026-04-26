@@ -11,6 +11,7 @@ import { TitleControlPanel } from '@/features/poster/ui/TitleControlPanel'
 import { PosterFrame } from '@/features/poster/ui/PosterFrame'
 import { FontPicker } from '@/features/typography/ui/FontPicker'
 import { MarkerEditor } from '@/features/markers/ui/MarkerEditor'
+import { GpxImportButton } from '@/features/gpx/ui/GpxImportButton'
 
 export default function App() {
   return (
@@ -33,6 +34,8 @@ export default function App() {
           <FontPicker />
           <hr className="border-border/30" />
           <MarkerEditor />
+          <hr className="border-border/30" />
+          <GpxImportButton />
           <hr className="border-border/30" />
           <TitleControlPanel />
           <hr className="border-border/30" />

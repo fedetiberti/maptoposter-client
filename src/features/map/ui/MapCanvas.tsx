@@ -10,6 +10,7 @@ import { resolveTheme } from '@/features/theme/domain/Theme'
 import { buildMapStyle } from '@/features/theme/application/mapStyleSpec'
 import { services } from '@/core/services'
 import { MarkerOverlay } from '@/features/markers/application/MarkerOverlay'
+import { GpxOverlay } from '@/features/gpx/application/GpxOverlay'
 
 export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -58,6 +59,7 @@ export function MapCanvas() {
     <>
       <div ref={containerRef} className="absolute inset-0 h-full w-full" />
       <MarkerOverlay engine={engine} />
+      <GpxOverlay engine={engine} />
     </>
   )
 }
