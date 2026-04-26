@@ -2,6 +2,7 @@ import { computeTitleFontSizes, formatCoords } from '@/features/poster/domain/te
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { usePosterState } from '@/features/poster/application/PosterContext'
+import { findFont } from '@/data/fonts'
 
 interface TitleBlockProps {
   /** Width in CSS px of the poster preview area. */
@@ -37,7 +38,8 @@ export function TitleBlock({ width, height, exportWidthPx }: TitleBlockProps) {
   const dividerWidthPx = fontSizes.divider.widthPx * previewScale
   const dividerStrokePx = Math.max(1, fontSizes.divider.strokePx * previewScale)
 
-  const fontFamily = `"${font.googleFamily ?? cssFontFamilyFor(font.id)}", system-ui, sans-serif`
+  const fontDef = findFont(font.id)
+  const fontFamily = `"${fontDef?.cssFamily ?? font.googleFamily ?? 'Inter Variable'}", system-ui, sans-serif`
 
   return (
     <div
@@ -119,17 +121,3 @@ export function TitleBlock({ width, height, exportWidthPx }: TitleBlockProps) {
   )
 }
 
-function cssFontFamilyFor(id: string): string {
-  // Bundled @fontsource families expose families with these CSS names.
-  const map: Record<string, string> = {
-    'bebas-neue': 'Bebas Neue',
-    lato: 'Lato',
-    merriweather: 'Merriweather',
-    montserrat: 'Montserrat',
-    oswald: 'Oswald',
-    'playfair-display': 'Playfair Display',
-    raleway: 'Raleway',
-    'noto-sans-jp': 'Noto Sans JP',
-  }
-  return map[id] ?? 'Inter Variable'
-}

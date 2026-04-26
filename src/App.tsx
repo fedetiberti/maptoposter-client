@@ -9,6 +9,7 @@ import { ReverseGeocoderEffect } from '@/features/location/ui/ReverseGeocoderEff
 import { LayoutPicker } from '@/features/layout/ui/LayoutPicker'
 import { TitleControlPanel } from '@/features/poster/ui/TitleControlPanel'
 import { PosterFrame } from '@/features/poster/ui/PosterFrame'
+import { FontPicker } from '@/features/typography/ui/FontPicker'
 
 export default function App() {
   return (
@@ -19,7 +20,7 @@ export default function App() {
         <PosterFrame />
         <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4">
           <div className="pointer-events-auto rounded-full border border-border/60 bg-card/50 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground backdrop-blur-md">
-            maptoposter · phase 4
+            maptoposter · phase 5
           </div>
         </header>
 
@@ -27,6 +28,8 @@ export default function App() {
           <LocationPanel />
           <hr className="border-border/30" />
           <LayoutPicker />
+          <hr className="border-border/30" />
+          <FontPicker />
           <hr className="border-border/30" />
           <TitleControlPanel />
           <hr className="border-border/30" />

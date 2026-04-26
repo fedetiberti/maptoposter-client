@@ -3,9 +3,15 @@ import { FetchHttpAdapter } from '@/core/http/FetchHttpAdapter'
 import { MemoryTtlCache } from '@/core/cache/MemoryTtlCache'
 import { NominatimAdapter } from '@/features/location/infrastructure/NominatimAdapter'
 
-class StubFontsAdapter implements IFonts {
-  async ensureLoaded(): Promise<void> {
-    await document.fonts.ready
+import { ensureFontReady } from '@/core/fonts/ensureGoogleFont'
+import { findFont } from '@/data/fonts'
+
+class FontsAdapter implements IFonts {
+  async ensureLoaded(family: string, weight: number): Promise<void> {
+    const font = findFont(family)
+    const cssFamily = font?.cssFamily ?? family
+    const googleFamily = font?.source === 'google' ? font.googleFamily ?? family : null
+    await ensureFontReady(cssFamily, googleFamily, weight)
   }
 }
 
@@ -33,7 +39,7 @@ function buildServices(): Services {
   return {
     http,
     cache,
-    fonts: new StubFontsAdapter(),
+    fonts: new FontsAdapter(),
     nominatim: new NominatimAdapter(http, cache, config.nominatimBaseUrl),
     config,
   }
