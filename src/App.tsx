@@ -9,6 +9,7 @@ import { BrandOverlay } from '@/features/dock/ui/BrandOverlay'
 import { ExportFAB } from '@/features/export/ui/ExportFAB'
 import { InstallPrompt } from '@/features/install/ui/InstallPrompt'
 import { UpdatePrompt } from '@/features/install/ui/UpdatePrompt'
+import { UtilityActions } from '@/features/poster/ui/UtilityActions'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <PosterFrame />
           <BrandOverlay />
           <Dock />
+          <UtilityActions />
           <ExportFAB />
           <InstallPrompt />
           <UpdatePrompt />

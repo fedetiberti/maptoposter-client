@@ -204,3 +204,4 @@ export type PosterAction =
   | { type: 'SET_EXPORT'; patch: Partial<ExportSettings> }
   | { type: 'SET_REVERSE_GEOCODE_ON_PAN'; enabled: boolean }
   | { type: 'RESET' }
+  | { type: 'HYDRATE'; state: PosterState }

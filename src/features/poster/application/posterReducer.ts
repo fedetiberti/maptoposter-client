@@ -82,5 +82,8 @@ export function posterReducer(state: PosterState, action: PosterAction): PosterS
 
     case 'RESET':
       return DEFAULT_POSTER_STATE
+
+    case 'HYDRATE':
+      return action.state
   }
 }
