@@ -7,6 +7,8 @@ import { DockProvider } from '@/features/dock/application/DockContext'
 import { StatusBar } from '@/features/dock/ui/StatusBar'
 import { BrandOverlay } from '@/features/dock/ui/BrandOverlay'
 import { ExportFAB } from '@/features/export/ui/ExportFAB'
+import { InstallPrompt } from '@/features/install/ui/InstallPrompt'
+import { UpdatePrompt } from '@/features/install/ui/UpdatePrompt'
 
 export default function App() {
   return (
@@ -24,6 +26,8 @@ export default function App() {
           <BrandOverlay />
           <Dock />
           <ExportFAB />
+          <InstallPrompt />
+          <UpdatePrompt />
           <StatusBar />
         </main>
       </DockProvider>
