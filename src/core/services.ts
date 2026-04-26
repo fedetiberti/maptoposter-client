@@ -1,6 +1,7 @@
 import type { ICache, IFonts, IHttp } from '@/core/ports'
 import { FetchHttpAdapter } from '@/core/http/FetchHttpAdapter'
 import { MemoryTtlCache } from '@/core/cache/MemoryTtlCache'
+import { NominatimAdapter } from '@/features/location/infrastructure/NominatimAdapter'
 
 class StubFontsAdapter implements IFonts {
   async ensureLoaded(): Promise<void> {
@@ -12,6 +13,7 @@ interface Services {
   http: IHttp
   cache: ICache
   fonts: IFonts
+  nominatim: NominatimAdapter
   config: {
     nominatimBaseUrl: string
     tilesBaseUrl: string
@@ -19,17 +21,21 @@ interface Services {
 }
 
 function buildServices(): Services {
+  const config = {
+    nominatimBaseUrl:
+      import.meta.env.VITE_NOMINATIM_BASE_URL ??
+      'https://nominatim.openstreetmap.org',
+    tilesBaseUrl:
+      import.meta.env.VITE_TILES_BASE_URL ?? 'https://tiles.openfreemap.org',
+  }
+  const http = new FetchHttpAdapter()
+  const cache = new MemoryTtlCache()
   return {
-    http: new FetchHttpAdapter(),
-    cache: new MemoryTtlCache(),
+    http,
+    cache,
     fonts: new StubFontsAdapter(),
-    config: {
-      nominatimBaseUrl:
-        import.meta.env.VITE_NOMINATIM_BASE_URL ??
-        'https://nominatim.openstreetmap.org',
-      tilesBaseUrl:
-        import.meta.env.VITE_TILES_BASE_URL ?? 'https://tiles.openfreemap.org',
-    },
+    nominatim: new NominatimAdapter(http, cache, config.nominatimBaseUrl),
+    config,
   }
 }
 
