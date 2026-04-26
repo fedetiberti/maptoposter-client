@@ -63,7 +63,6 @@ const GOOGLE: FontDef[] = [
   ...mkGoogle('Barlow', 'sans', [500, 800]),
   ...mkGoogle('Bebas Kai', 'display'),
   ...mkGoogle('DM Sans', 'sans', [500, 700]),
-  ...mkGoogle('Inter', 'sans', [500, 700]),
   ...mkGoogle('Manrope', 'sans', [500, 700]),
   ...mkGoogle('Mulish', 'sans', [500, 800]),
   ...mkGoogle('Nunito', 'sans', [500, 800]),

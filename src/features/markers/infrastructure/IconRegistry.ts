@@ -54,19 +54,28 @@ function writeCustomToStorage(records: CustomIconRecord[]): void {
 
 class IconRegistryImpl {
   private listeners = new Set<() => void>()
+  private snapshot: MarkerIcon[] | null = null
 
   list(): MarkerIcon[] {
+    // Stable reference until invalidated: required by useSyncExternalStore.
+    if (this.snapshot) return this.snapshot
     const custom = readCustomFromStorage().map((r) => ({
       id: r.id,
       name: r.name,
       svg: r.svg,
       source: 'custom' as const,
     }))
-    return [...BUILTIN_ICONS, ...custom]
+    this.snapshot = [...BUILTIN_ICONS, ...custom]
+    return this.snapshot
   }
 
   find(id: string): MarkerIcon | undefined {
     return this.list().find((i) => i.id === id)
+  }
+
+  private invalidate(): void {
+    this.snapshot = null
+    this.emit()
   }
 
   /**
@@ -90,14 +99,14 @@ class IconRegistryImpl {
     }
     records.push(record)
     writeCustomToStorage(records)
-    this.emit()
+    this.invalidate()
     return { id, name: record.name, svg: sanitized, source: 'custom' }
   }
 
   removeCustom(id: string): void {
     const records = readCustomFromStorage().filter((r) => r.id !== id)
     writeCustomToStorage(records)
-    this.emit()
+    this.invalidate()
   }
 
   subscribe(fn: () => void): () => void {

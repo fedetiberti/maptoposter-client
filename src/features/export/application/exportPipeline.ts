@@ -96,10 +96,7 @@ export async function runExport(
   }
 
   // Pre-load the title-block font.
-  const fontDef = (await import('@/data/fonts')).findFont(state.font.id)
-  if (fontDef) {
-    await services.fonts.ensureLoaded(fontDef.id, state.font.weight).catch(() => undefined)
-  }
+  await services.fonts.ensureLoaded(state.font.id, state.font.weight).catch(() => undefined)
 
   // Build the resolved style.
   const fallbackTheme = THEMES[0]
