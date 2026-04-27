@@ -62,8 +62,9 @@ function drawFades(
   W: number,
   H: number,
 ): void {
-  // Top fade: small, decorative.
-  const topH = Math.round(H * 0.12)
+  // Match the original maptoposter: 25% bands at top and bottom, pure linear
+  // alpha ramp (1 at the edge → 0 at 25% in) in the theme bg color.
+  const topH = Math.round(H * 0.25)
   const topGrad = ctx.createLinearGradient(0, 0, 0, topH)
   topGrad.addColorStop(0, bgHex)
   topGrad.addColorStop(1, rgbaWithAlpha(bgHex, 0))
@@ -72,15 +73,14 @@ function drawFades(
   ctx.fillRect(0, 0, W, topH)
   ctx.restore()
 
-  // Bottom fade: larger, opaque-by-the-bottom so text reads cleanly.
-  const botStartY = Math.round(H * 0.68)
+  const botH = Math.round(H * 0.25)
+  const botStartY = H - botH
   const botGrad = ctx.createLinearGradient(0, botStartY, 0, H)
   botGrad.addColorStop(0, rgbaWithAlpha(bgHex, 0))
-  botGrad.addColorStop(0.72, bgHex)
   botGrad.addColorStop(1, bgHex)
   ctx.save()
   ctx.fillStyle = botGrad
-  ctx.fillRect(0, botStartY, W, H - botStartY)
+  ctx.fillRect(0, botStartY, W, botH)
   ctx.restore()
 }
 

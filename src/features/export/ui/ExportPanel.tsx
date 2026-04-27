@@ -4,6 +4,7 @@ import {
   usePosterDispatch,
   usePosterState,
 } from '@/features/poster/application/PosterContext'
+import { useFramePresentation } from '@/features/poster/application/FramePresentationContext'
 import { runExport, type ExportProgress } from '@/features/export/application/exportPipeline'
 import type { ExportFormat } from '@/features/poster/domain/PosterState'
 import { findLayout, LAYOUTS } from '@/data/layouts'
@@ -15,6 +16,7 @@ const FORMATS: readonly ExportFormat[] = ['png', 'pdf', 'svg']
 export function ExportPanel() {
   const state = usePosterState()
   const dispatch = usePosterDispatch()
+  const { viewportSize, previewBox } = useFramePresentation()
   const [exporting, setExporting] = useState(false)
   const [progress, setProgress] = useState<ExportProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +40,10 @@ export function ExportPanel() {
 
   async function doExport(): Promise<void> {
     setError(null)
+    if (!viewportSize || !previewBox) {
+      setError('Preview not ready — try again in a moment.')
+      return
+    }
     setExporting(true)
     setProgress({ stage: 'preparing', percent: 0 })
     try {
@@ -45,8 +51,9 @@ export function ExportPanel() {
         {
           state,
           format: state.exportSettings.format,
-          liveViewportWidth: window.innerWidth,
-          liveViewportHeight: window.innerHeight,
+          liveViewportWidth: viewportSize.width,
+          liveViewportHeight: viewportSize.height,
+          previewBox,
         },
         (p) => setProgress(p),
       )

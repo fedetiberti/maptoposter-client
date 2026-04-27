@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { findLayout, LAYOUTS } from '@/data/layouts'
 import { aspectRatio } from '@/features/layout/domain/Layout'
 import {
@@ -8,6 +8,7 @@ import {
 } from '@/features/layout/application/computePreviewBox'
 import { useResizeObserver } from '@/shared/hooks/useResizeObserver'
 import { usePosterState } from '@/features/poster/application/PosterContext'
+import { useFramePresentation } from '@/features/poster/application/FramePresentationContext'
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { TitleBlock } from '@/features/poster/ui/TitleBlock'
@@ -21,23 +22,19 @@ export function PosterFrame() {
   const containerRef = useRef<HTMLDivElement>(null)
   const size = useResizeObserver(containerRef)
   const state = usePosterState()
-  const fallbackLayout = LAYOUTS[3] // a4-portrait
-  if (!fallbackLayout) return null
-  const fallbackTheme = THEMES[0]
-  if (!fallbackTheme) return null
+  const presentation = useFramePresentation()
+  const setPresentation = presentation.set
 
-  const layout =
-    state.layout.kind === 'preset'
-      ? findLayout(state.layout.presetId) ?? fallbackLayout
-      : null
+  const presetLayout =
+    state.layout.kind === 'preset' ? findLayout(state.layout.presetId) : undefined
+  const fallbackLayout = LAYOUTS[3] // a4-portrait
   const customRatio =
     state.layout.kind === 'custom'
       ? state.layout.widthPx / state.layout.heightPx
       : 0
-  const ratio = layout ? aspectRatio(layout) : customRatio || 0.7071
-
-  const theme = findTheme(state.theme.id) ?? fallbackTheme
-  const colors = resolveTheme(theme, state.theme.overrides)
+  const ratio = presetLayout
+    ? aspectRatio(presetLayout)
+    : customRatio || (fallbackLayout ? aspectRatio(fallbackLayout) : 0.7071)
 
   const previewBox = size
     ? computePreviewBox(size, ratio, {
@@ -45,6 +42,29 @@ export function PosterFrame() {
         rightDockPx: POSTER_RIGHT_DOCK_PX,
       })
     : null
+
+  // Publish viewport + computed frame so the export pipeline reads the exact
+  // same numbers the user is looking at (no drift between window.innerWidth
+  // and the container we measure here). Primitive deps because `previewBox` is
+  // recomputed every render — depending on the object identity would publish
+  // on every render even when the values are unchanged.
+  useEffect(() => {
+    setPresentation({ viewportSize: size ?? null, previewBox: previewBox ?? null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    setPresentation,
+    size?.width,
+    size?.height,
+    previewBox?.x,
+    previewBox?.y,
+    previewBox?.width,
+    previewBox?.height,
+  ])
+
+  const fallbackTheme = THEMES[0]
+  if (!fallbackTheme) return null
+  const theme = findTheme(state.theme.id) ?? fallbackTheme
+  const colors = resolveTheme(theme, state.theme.overrides)
 
   return (
     <div
@@ -70,20 +90,20 @@ export function PosterFrame() {
             overflow: 'hidden',
           }}
         >
-          {/* Top + bottom gradient fades — let the map show through edge-to-edge,
-              fading into the theme bg color so the title block stays readable. */}
+          {/* Top + bottom gradient fades — match the original maptoposter:
+              25% bands fading linearly from theme bg at the edge to transparent. */}
           <div
             className="pointer-events-none absolute inset-x-0 top-0"
             style={{
-              height: '12%',
+              height: '25%',
               background: `linear-gradient(to bottom, ${colors['ui.bg']} 0%, transparent 100%)`,
             }}
           />
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0"
             style={{
-              height: '32%',
-              background: `linear-gradient(to top, ${colors['ui.bg']} 0%, ${colors['ui.bg']} 28%, transparent 100%)`,
+              height: '25%',
+              background: `linear-gradient(to top, ${colors['ui.bg']} 0%, transparent 100%)`,
             }}
           />
           <TitleBlock width={previewBox.width} height={previewBox.height} />

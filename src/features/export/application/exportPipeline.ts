@@ -1,5 +1,5 @@
 import { findLayout, LAYOUTS } from '@/data/layouts'
-import { exportSize, aspectRatio } from '@/features/layout/domain/Layout'
+import { exportSize } from '@/features/layout/domain/Layout'
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { buildMapStyle } from '@/features/theme/application/mapStyleSpec'
@@ -12,11 +12,7 @@ import { encodeSvg } from '@/features/export/infrastructure/svg/encodeSvg'
 import { downloadBlob } from '@/shared/utils/downloadBlob'
 import { services } from '@/core/services'
 import { renderTiled } from '@/features/export/application/tileRender'
-import {
-  computePreviewBox,
-  POSTER_MARGIN_PX,
-  POSTER_RIGHT_DOCK_PX,
-} from '@/features/layout/application/computePreviewBox'
+import type { PreviewBox } from '@/features/layout/application/computePreviewBox'
 import {
   lonLatToWorldPx,
   worldPxToLonLat,
@@ -29,9 +25,11 @@ export const TILED_MAX_PIXELS = 256_000_000
 export interface ExportRequest {
   state: PosterState
   format: ExportFormat
-  /** Live viewport width (used to compute the export zoom). */
+  /** Live viewport width (used to compute the offset of the frame center). */
   liveViewportWidth: number
   liveViewportHeight: number
+  /** The exact frame rect the user is looking at, measured by PosterFrame. */
+  previewBox: PreviewBox
 }
 
 export interface ExportProgress {
@@ -126,16 +124,17 @@ export async function runExport(
   // projecting the on-screen pixel offset through web mercator at the
   // current zoom. Then choose an exportZoom such that the export's pixel
   // box covers the same geographic extent as the frame's pixel box.
+  //
+  // We use the previewBox the PosterFrame component actually rendered with,
+  // not a recomputed one — this keeps preview and export in lockstep even if
+  // the frame's measured size diverges from window.innerWidth/Height.
   const exportView = computeFrameProjection({
     state,
     viewportWidth: req.liveViewportWidth,
     viewportHeight: req.liveViewportHeight,
+    previewBox: req.previewBox,
     exportWidthPx: size.widthPx,
     exportHeightPx: size.heightPx,
-    layoutAspect:
-      state.layout.kind === 'preset'
-        ? aspectRatio(findLayout(state.layout.presetId) ?? LAYOUTS[3]!)
-        : state.layout.widthPx / state.layout.heightPx,
   })
 
   onProgress({ stage: 'rendering', percent: 15 })
@@ -203,9 +202,9 @@ interface FrameProjectionInput {
   state: PosterState
   viewportWidth: number
   viewportHeight: number
+  previewBox: PreviewBox
   exportWidthPx: number
   exportHeightPx: number
-  layoutAspect: number
 }
 
 /**
@@ -216,14 +215,7 @@ function computeFrameProjection(input: FrameProjectionInput): {
   view: MapView
   zoom: number
 } {
-  const previewBox = computePreviewBox(
-    { width: input.viewportWidth, height: input.viewportHeight },
-    input.layoutAspect,
-    {
-      marginPx: POSTER_MARGIN_PX,
-      rightDockPx: POSTER_RIGHT_DOCK_PX,
-    },
-  )
+  const { previewBox } = input
   // Frame center (in screen pixels) and its offset from the window center.
   const frameCenterX = previewBox.x + previewBox.width / 2
   const frameCenterY = previewBox.y + previewBox.height / 2

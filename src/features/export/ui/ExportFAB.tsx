@@ -4,6 +4,7 @@ import { useDock } from '@/features/dock/application/DockContext'
 import {
   usePosterState,
 } from '@/features/poster/application/PosterContext'
+import { useFramePresentation } from '@/features/poster/application/FramePresentationContext'
 import { runExport, type ExportProgress } from '@/features/export/application/exportPipeline'
 import { findLayout, LAYOUTS } from '@/data/layouts'
 import { exportSize } from '@/features/layout/domain/Layout'
@@ -16,6 +17,7 @@ import { exportSize } from '@/features/layout/domain/Layout'
 export function ExportFAB() {
   const state = usePosterState()
   const { open } = useDock()
+  const { viewportSize, previewBox } = useFramePresentation()
   const [progress, setProgress] = useState<ExportProgress | null>(null)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +39,10 @@ export function ExportFAB() {
 
   async function quickExport(): Promise<void> {
     setError(null)
+    if (!viewportSize || !previewBox) {
+      setError('Preview not ready — try again in a moment.')
+      return
+    }
     setExporting(true)
     setProgress({ stage: 'preparing', percent: 0 })
     try {
@@ -44,8 +50,9 @@ export function ExportFAB() {
         {
           state,
           format: state.exportSettings.format,
-          liveViewportWidth: window.innerWidth,
-          liveViewportHeight: window.innerHeight,
+          liveViewportWidth: viewportSize.width,
+          liveViewportHeight: viewportSize.height,
+          previewBox,
         },
         (p) => setProgress(p),
       )
