@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- provider + hook share a file by design */
 import {
   createContext,
   useContext,

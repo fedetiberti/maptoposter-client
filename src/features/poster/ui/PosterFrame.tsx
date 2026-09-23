@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { findLayout, LAYOUTS } from '@/data/layouts'
 import { aspectRatio } from '@/features/layout/domain/Layout'
-import {
-  computePreviewBox,
-  POSTER_MARGIN_PX,
-  POSTER_RIGHT_DOCK_PX,
-} from '@/features/layout/application/computePreviewBox'
+import { computePreviewBox } from '@/features/layout/application/computePreviewBox'
 import { useResizeObserver } from '@/shared/hooks/useResizeObserver'
 import { usePosterState } from '@/features/poster/application/PosterContext'
 import { useFramePresentation } from '@/features/poster/application/FramePresentationContext'
@@ -36,12 +32,7 @@ export function PosterFrame() {
     ? aspectRatio(presetLayout)
     : customRatio || (fallbackLayout ? aspectRatio(fallbackLayout) : 0.7071)
 
-  const previewBox = size
-    ? computePreviewBox(size, ratio, {
-        marginPx: POSTER_MARGIN_PX,
-        rightDockPx: POSTER_RIGHT_DOCK_PX,
-      })
-    : null
+  const previewBox = size ? computePreviewBox(size, ratio) : null
 
   // Publish viewport + computed frame so the export pipeline reads the exact
   // same numbers the user is looking at (no drift between window.innerWidth

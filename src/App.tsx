@@ -10,31 +10,32 @@ import { BrandOverlay } from '@/features/dock/ui/BrandOverlay'
 import { ExportFAB } from '@/features/export/ui/ExportFAB'
 import { InstallPrompt } from '@/features/install/ui/InstallPrompt'
 import { UpdatePrompt } from '@/features/install/ui/UpdatePrompt'
-import { UtilityActions } from '@/features/poster/ui/UtilityActions'
+import { ExportRunnerProvider } from '@/features/export/application/ExportRunnerContext'
 
 export default function App() {
   return (
     <PosterProvider>
       <FramePresentationProvider>
-        <DockProvider>
-          <ReverseGeocoderEffect />
-          <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
-            {/* Subtle grid texture under the map for atelier feel */}
-            <div
-              className="grid-grain pointer-events-none absolute inset-0 opacity-40"
-              aria-hidden
-            />
-            <MapCanvas />
-            <PosterFrame />
-            <BrandOverlay />
-            <Dock />
-            <UtilityActions />
-            <ExportFAB />
-            <InstallPrompt />
-            <UpdatePrompt />
-            <StatusBar />
-          </main>
-        </DockProvider>
+        <ExportRunnerProvider>
+          <DockProvider>
+            <ReverseGeocoderEffect />
+            <main className="relative h-dvh w-screen overflow-hidden bg-background text-foreground">
+              {/* Subtle grid texture under the map for atelier feel */}
+              <div
+                className="grid-grain pointer-events-none absolute inset-0 opacity-40"
+                aria-hidden
+              />
+              <MapCanvas />
+              <PosterFrame />
+              <BrandOverlay />
+              <Dock />
+              <ExportFAB />
+              <InstallPrompt />
+              <UpdatePrompt />
+              <StatusBar />
+            </main>
+          </DockProvider>
+        </ExportRunnerProvider>
       </FramePresentationProvider>
     </PosterProvider>
   )

@@ -1,5 +1,7 @@
-import { findLayout, LAYOUTS } from '@/data/layouts'
-import { exportSize } from '@/features/layout/domain/Layout'
+import {
+  resolveExportSize,
+  type ResolvedExportSize,
+} from '@/features/layout/application/resolveExportSize'
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { buildMapStyle } from '@/features/theme/application/mapStyleSpec'
@@ -13,14 +15,20 @@ import { downloadBlob } from '@/shared/utils/downloadBlob'
 import { services } from '@/core/services'
 import { renderTiled } from '@/features/export/application/tileRender'
 import type { PreviewBox } from '@/features/layout/application/computePreviewBox'
-import {
-  lonLatToWorldPx,
-  worldPxToLonLat,
-} from '@/features/export/application/projection'
+import { screenOffsetToLonLat } from '@/features/export/application/projection'
 
-export const SINGLE_PASS_MAX_SIDE = 8192
+/**
+ * MapLibre clamps its canvas to 4096×4096 by default and WebGL renderbuffers
+ * are commonly limited to 4096–8192 px, so anything larger is tiled.
+ */
+export const SINGLE_PASS_MAX_SIDE = 4096
 export const TILED_MAX_SIDE = 16384
 export const TILED_MAX_PIXELS = 256_000_000
+/**
+ * SVG export base64-encodes the PNG into a string; beyond ~40 MP the data
+ * URL alone exceeds browser string / blob limits.
+ */
+export const SVG_MAX_PIXELS = 40_000_000
 
 export interface ExportRequest {
   state: PosterState
@@ -40,40 +48,7 @@ export interface ExportProgress {
 
 export type ProgressCb = (p: ExportProgress) => void
 
-interface ResolvedSize {
-  widthPx: number
-  heightPx: number
-  physicalWidthIn: number
-  physicalHeightIn: number
-}
-
-function resolveSize(state: PosterState): ResolvedSize {
-  const dpi = state.layout.dpi
-  if (state.layout.kind === 'preset') {
-    const layout = findLayout(state.layout.presetId) ?? LAYOUTS[3]
-    if (!layout) throw new Error('layout not found')
-    const { widthPx, heightPx } = exportSize(layout, dpi)
-    if (layout.physical) {
-      const w = layout.physical.unit === 'in' ? layout.physical.w : layout.physical.w / 25.4
-      const h = layout.physical.unit === 'in' ? layout.physical.h : layout.physical.h / 25.4
-      return { widthPx, heightPx, physicalWidthIn: w, physicalHeightIn: h }
-    }
-    return {
-      widthPx,
-      heightPx,
-      physicalWidthIn: widthPx / dpi,
-      physicalHeightIn: heightPx / dpi,
-    }
-  }
-  return {
-    widthPx: state.layout.widthPx,
-    heightPx: state.layout.heightPx,
-    physicalWidthIn: state.layout.widthPx / dpi,
-    physicalHeightIn: state.layout.heightPx / dpi,
-  }
-}
-
-function fileNameFor(state: PosterState, format: ExportFormat, size: ResolvedSize): string {
+function fileNameFor(state: PosterState, format: ExportFormat, size: ResolvedExportSize): string {
   const city =
     (state.title.cityLabel ?? state.title.city ?? 'poster')
       .toLowerCase()
@@ -90,7 +65,7 @@ export async function runExport(
   const { state, format } = req
   onProgress({ stage: 'preparing', percent: 5 })
 
-  const size = resolveSize(state)
+  const size = resolveExportSize(state.layout)
   if (Math.max(size.widthPx, size.heightPx) > TILED_MAX_SIDE) {
     throw new Error(
       `Export size ${size.widthPx}×${size.heightPx} exceeds maximum ${TILED_MAX_SIDE}px on the long side.`,
@@ -101,9 +76,14 @@ export async function runExport(
       `Export size ${size.widthPx}×${size.heightPx} exceeds maximum total ${TILED_MAX_PIXELS / 1_000_000}MP.`,
     )
   }
+  if (format === 'svg' && size.widthPx * size.heightPx > SVG_MAX_PIXELS) {
+    throw new Error(
+      `SVG export is limited to ${SVG_MAX_PIXELS / 1_000_000} MP (it embeds the raster as base64). Use PNG or PDF for this size.`,
+    )
+  }
 
-  // Pre-load the title-block font.
-  await services.fonts.ensureLoaded(state.font.id, state.font.weight).catch(() => undefined)
+  // Pre-load every weight the title block uses (city / country / coords).
+  await services.fonts.ensureLoaded(state.font.id).catch(() => undefined)
 
   // Build the resolved style.
   const fallbackTheme = THEMES[0]
@@ -170,11 +150,13 @@ export async function runExport(
       centerLat: result.centerLat,
       centerLon: result.centerLon,
       zoom: result.effectiveZoom,
+      bearing: state.view.bearing,
       exportWidthPx: size.widthPx,
       exportHeightPx: size.heightPx,
     },
     state,
     themeColors: colors,
+    previewScale: size.widthPx / Math.max(1, req.previewBox.width),
   })
 
   onProgress({ stage: 'encoding', percent: 90 })
@@ -223,14 +205,9 @@ function computeFrameProjection(input: FrameProjectionInput): {
   const offsetY = frameCenterY - input.viewportHeight / 2
 
   // At the current zoom, 1 world-px = 1 screen-px, so the offset translates
-  // directly into a world-pixel shift. Convert back to lon/lat.
+  // into a world-pixel shift once the camera bearing is undone.
   const stateView = input.state.view
-  const stateWorld = lonLatToWorldPx(stateView.lon, stateView.lat, stateView.zoom)
-  const frameWorld = {
-    x: stateWorld.x + offsetX,
-    y: stateWorld.y + offsetY,
-  }
-  const frameLonLat = worldPxToLonLat(frameWorld.x, frameWorld.y, stateView.zoom)
+  const frameLonLat = screenOffsetToLonLat(stateView, offsetX, offsetY)
 
   // Zoom that makes the export pixel box cover the same geographic extent
   // as the preview pixel box. Pick the dimension that constrains scale on

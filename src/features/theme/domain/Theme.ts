@@ -6,7 +6,8 @@ export interface Theme {
   id: string
   name: string
   description: string
-  source: 'local' | 'authored'
+  /** local = ported from the Python maptoposter; authored = terraink-style register; atelier = designed for this app. */
+  source: 'local' | 'authored' | 'atelier'
   colors: ThemeColors
 }
 

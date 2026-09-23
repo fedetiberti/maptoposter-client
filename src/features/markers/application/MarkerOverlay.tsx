@@ -83,9 +83,10 @@ export function MarkerOverlay({ engine }: { engine: MapEngine | null }) {
 
   // Final cleanup when engine changes.
   useEffect(() => {
+    const live = marksRef.current
     return () => {
-      for (const marker of marksRef.current.values()) marker.remove()
-      marksRef.current.clear()
+      for (const marker of live.values()) marker.remove()
+      live.clear()
     }
   }, [engine])
 

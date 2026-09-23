@@ -40,6 +40,10 @@ export function MapCanvas() {
     })
     engineRef.current = e
     setEngine(e)
+    if (import.meta.env.DEV) {
+      // Test hook: lets end-to-end scripts drive / inspect the live map.
+      ;(window as unknown as { __mtpMap?: unknown }).__mtpMap = e.getMap()
+    }
     return () => {
       e.destroy()
       engineRef.current = null

@@ -1,21 +1,33 @@
 import { lonLatToExportPx, type ExportProjection } from '@/features/export/application/projection'
-import { computeTitleFontSizes, formatCoords } from '@/features/poster/domain/textLayout'
+import {
+  computeTitleFontSizes,
+  formatCoords,
+  resolveTitleWeights,
+  TITLE_BLOCK,
+} from '@/features/poster/domain/textLayout'
 import { tintSvg } from '@/features/markers/application/tintSvg'
 import { iconRegistry } from '@/features/markers/infrastructure/IconRegistry'
 import type {
+  GpxState,
   Marker,
   PosterState,
 } from '@/features/poster/domain/PosterState'
 import type { ThemeColors } from '@/features/theme/domain/Theme'
-import type { GpxState } from '@/features/poster/domain/PosterState'
 import { findFont } from '@/data/fonts'
 import { hexToRgb } from '@/shared/utils/color'
+import { gpxLineWidthAtZoom } from '@/features/gpx/domain/gpxStyle'
 
 interface CompositeOpts {
   canvas: HTMLCanvasElement
   proj: ExportProjection
   state: PosterState
   themeColors: ThemeColors
+  /**
+   * Export px per on-screen preview px. Markers and the GPX stroke are sized
+   * in screen pixels in the live preview; multiplying by this keeps them the
+   * same size *relative to the poster* in the export.
+   */
+  previewScale: number
 }
 
 function rgbaWithAlpha(hex: string, alpha: number): string {
@@ -32,6 +44,7 @@ export async function compositeOverlay({
   proj,
   state,
   themeColors,
+  previewScale,
 }: CompositeOpts): Promise<void> {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('2D context unavailable')
@@ -39,12 +52,12 @@ export async function compositeOverlay({
 
   // ── 1. GPX line ────────────────────────────────────────────────────────
   if (state.gpx) {
-    drawGpx(ctx, state.gpx, proj, themeColors)
+    drawGpx(ctx, state.gpx, proj, themeColors, state.view.zoom, previewScale)
   }
 
   // ── 2. Markers ─────────────────────────────────────────────────────────
   for (const m of state.markers) {
-    await drawMarker(ctx, m, proj)
+    await drawMarker(ctx, m, proj, previewScale)
   }
 
   // ── 3. Top + bottom gradient fades ─────────────────────────────────────
@@ -53,7 +66,7 @@ export async function compositeOverlay({
   drawFades(ctx, themeColors['ui.bg'], W, H)
 
   // ── 4. Title block text ────────────────────────────────────────────────
-  drawTitleBlock(ctx, state, themeColors, W, H)
+  drawTitleBlock(ctx, state, themeColors, proj, W, H)
 }
 
 function drawFades(
@@ -89,11 +102,13 @@ function drawGpx(
   gpx: GpxState,
   proj: ExportProjection,
   colors: ThemeColors,
+  liveZoom: number,
+  previewScale: number,
 ): void {
   if (gpx.geoJson.coordinates.length < 2) return
   ctx.save()
   ctx.strokeStyle = gpx.color ?? colors['ui.text']
-  ctx.lineWidth = Math.max(2, Math.round(proj.exportWidthPx / 700))
+  ctx.lineWidth = Math.max(1, gpxLineWidthAtZoom(liveZoom) * previewScale)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.globalAlpha = 0.95
@@ -120,15 +135,14 @@ async function drawMarker(
   ctx: CanvasRenderingContext2D,
   m: Marker,
   proj: ExportProjection,
+  previewScale: number,
 ): Promise<void> {
   const icon = iconRegistry.find(m.iconId) ?? iconRegistry.list()[0]
   if (!icon) return
-  const exportSize = Math.round(
-    m.sizePx * (proj.exportWidthPx / 1080), // calibrate so on-screen size at 1080 = export size at 1080
-  )
+  const exportSize = Math.max(1, Math.round(m.sizePx * previewScale))
   const { canvas: tintedCanvas } = await tintSvg(icon.svg, m.color, exportSize, 1)
   const p = lonLatToExportPx(proj, m.lon, m.lat)
-  // Anchor at bottom (pin tip points to coord)
+  // Anchor at bottom (pin tip points to coord) — same as the live MapLibre marker.
   ctx.drawImage(tintedCanvas, p.x - exportSize / 2, p.y - exportSize, exportSize, exportSize)
 }
 
@@ -136,15 +150,17 @@ function drawTitleBlock(
   ctx: CanvasRenderingContext2D,
   state: PosterState,
   colors: ThemeColors,
+  proj: ExportProjection,
   W: number,
   H: number,
 ): void {
   const city = (state.title.cityLabel ?? state.title.city ?? '').toUpperCase()
   const country = (state.title.countryLabel ?? state.title.country ?? '').toUpperCase()
-  const fontSizes = computeTitleFontSizes(W, city.length)
+  const fontSizes = computeTitleFontSizes(W, H, city.length)
   const fontDef = findFont(state.font.id)
-  const cssFamily = fontDef?.cssFamily ?? 'Inter Variable'
+  const cssFamily = fontDef?.cssFamily ?? state.font.googleFamily ?? 'Inter Variable'
   const familyChain = `"${cssFamily}", system-ui, sans-serif`
+  const weights = resolveTitleWeights(fontDef?.weights ?? [state.font.weight], state.font.weight)
 
   ctx.save()
   ctx.fillStyle = colors['ui.text']
@@ -152,16 +168,20 @@ function drawTitleBlock(
   ctx.textBaseline = 'middle'
 
   type CtxWithLetterSpacing = CanvasRenderingContext2D & { letterSpacing?: string }
+  const spaced = ctx as CtxWithLetterSpacing
 
-  // City — bold, big, wide letter-spacing
+  // City — bold, big, wide letter-spacing. Canvas letter-spacing adds the gap
+  // after every glyph including the last, so nudge by half a gap to keep the
+  // visible ink centred (CSS letter-spacing in the preview behaves the same).
   if (city) {
-    ctx.font = `700 ${fontSizes.city}px ${familyChain}`
-    ;(ctx as CtxWithLetterSpacing).letterSpacing = `${0.18 * fontSizes.city}px`
-    ctx.fillText(city, W / 2, H * 0.845)
+    const gap = TITLE_BLOCK.cityLetterSpacingEm * fontSizes.city
+    ctx.font = `${weights.city} ${fontSizes.city}px ${familyChain}`
+    spaced.letterSpacing = `${gap}px`
+    ctx.fillText(city, W / 2 + gap / 2, H * TITLE_BLOCK.cityYRatio)
   }
 
   // Divider — thin horizontal line
-  const dividerY = H * 0.875
+  const dividerY = H * TITLE_BLOCK.dividerYRatio
   ctx.strokeStyle = colors['ui.text']
   ctx.lineWidth = fontSizes.divider.strokePx
   ctx.globalAlpha = 0.7
@@ -173,18 +193,24 @@ function drawTitleBlock(
 
   // Country
   if (country) {
-    ctx.font = `300 ${fontSizes.country}px ${familyChain}`
-    ;(ctx as CtxWithLetterSpacing).letterSpacing = `${0.32 * fontSizes.country}px`
+    const gap = TITLE_BLOCK.countryLetterSpacingEm * fontSizes.country
+    ctx.font = `${weights.country} ${fontSizes.country}px ${familyChain}`
+    spaced.letterSpacing = `${gap}px`
     ctx.globalAlpha = 0.85
-    ctx.fillText(country, W / 2, H * 0.905)
+    ctx.fillText(country, W / 2 + gap / 2, H * TITLE_BLOCK.countryYRatio)
   }
 
-  // Coords
+  // Coords — of the poster centre, which is what the export actually shows.
   if (state.title.showCoordinates) {
-    ctx.font = `400 ${fontSizes.coords}px ${familyChain}`
-    ;(ctx as CtxWithLetterSpacing).letterSpacing = `${0.18 * fontSizes.coords}px`
+    const gap = TITLE_BLOCK.coordsLetterSpacingEm * fontSizes.coords
+    ctx.font = `${weights.coords} ${fontSizes.coords}px ${familyChain}`
+    spaced.letterSpacing = `${gap}px`
     ctx.globalAlpha = 0.6
-    ctx.fillText(formatCoords(state.view.lat, state.view.lon), W / 2, H * 0.935)
+    ctx.fillText(
+      formatCoords(proj.centerLat, proj.centerLon),
+      W / 2 + gap / 2,
+      H * TITLE_BLOCK.coordsYRatio,
+    )
   }
 
   ctx.restore()

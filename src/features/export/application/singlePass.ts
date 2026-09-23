@@ -47,6 +47,11 @@ export async function renderSinglePass(opts: SinglePassOpts): Promise<SinglePass
     attributionControl: false,
     interactive: false,
     fadeDuration: 0,
+    // 1 CSS px == 1 canvas px so the GL canvas is exactly the export size.
+    // Without these, MapLibre multiplies by devicePixelRatio and then clamps
+    // to its 4096×4096 default, silently downsampling print exports.
+    pixelRatio: 1,
+    maxCanvasSize: [opts.widthPx, opts.heightPx],
     canvasContextAttributes: { preserveDrawingBuffer: true },
   })
 
@@ -58,6 +63,12 @@ export async function renderSinglePass(opts: SinglePassOpts): Promise<SinglePass
 
     // Copy GL canvas into a fresh 2D canvas so we can composite onto it.
     const glCanvas = map.getCanvas()
+    if (glCanvas.width !== opts.widthPx || glCanvas.height !== opts.heightPx) {
+      throw new Error(
+        `Renderer produced ${glCanvas.width}×${glCanvas.height}, expected ${opts.widthPx}×${opts.heightPx}. ` +
+          'Your GPU may not support a canvas this large — try a smaller size or DPI.',
+      )
+    }
     const out = document.createElement('canvas')
     out.width = opts.widthPx
     out.height = opts.heightPx
@@ -76,23 +87,36 @@ export async function renderSinglePass(opts: SinglePassOpts): Promise<SinglePass
   }
 }
 
-function waitForIdle(map: maplibregl.Map): Promise<void> {
-  return new Promise((resolve) => {
-    if (map.loaded() && map.isStyleLoaded() && map.areTilesLoaded()) {
+export function waitForIdle(map: maplibregl.Map): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const ready = () => map.loaded() && map.isStyleLoaded() && map.areTilesLoaded()
+    if (ready()) {
       resolve()
       return
     }
-    const handler = () => {
-      if (map.loaded() && map.isStyleLoaded() && map.areTilesLoaded()) {
-        map.off('idle', handler)
+    const onIdle = () => {
+      if (ready()) {
+        cleanup()
         resolve()
       }
     }
-    map.on('idle', handler)
+    const onError = (e: { error?: Error }) => {
+      // Tile 404s (e.g. beyond max zoom) are recoverable; abort on style errors.
+      if (e.error && /style/i.test(e.error.message)) {
+        cleanup()
+        reject(e.error)
+      }
+    }
+    const cleanup = () => {
+      map.off('idle', onIdle)
+      map.off('error', onError)
+    }
+    map.on('idle', onIdle)
+    map.on('error', onError)
   })
 }
 
-function stableLoaded(map: maplibregl.Map): Promise<void> {
+export function stableLoaded(map: maplibregl.Map): Promise<void> {
   return new Promise((resolve) => {
     let confirms = 0
     const tick = () => {

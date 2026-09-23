@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- provider + hooks share a file by design */
 import {
   createContext,
   useCallback,
@@ -6,6 +7,7 @@ import {
   useMemo,
   useReducer,
   useRef,
+  useState,
   type Dispatch,
   type ReactNode,
 } from 'react'
@@ -69,19 +71,30 @@ export function PosterProvider({
   const redoRef = useRef<PosterState[]>([])
   const lastSnapshotRef = useRef<PosterState>(state)
   const isJumpingRef = useRef(false)
+  // Stack depths mirrored into React state so `canUndo` / `canRedo` re-render
+  // the toolbar the moment a snapshot is pushed (refs alone don't re-render).
+  const [depths, setDepths] = useState({ undo: 0, redo: 0 })
+  const syncDepths = useCallback(() => {
+    setDepths((cur) => {
+      const next = { undo: undoRef.current.length, redo: redoRef.current.length }
+      return cur.undo === next.undo && cur.redo === next.redo ? cur : next
+    })
+  }, [])
 
   // After every render, decide whether to snapshot.
   useEffect(() => {
     if (isJumpingRef.current) {
       isJumpingRef.current = false
       lastSnapshotRef.current = state
+      syncDepths()
       return
     }
     const prev = lastSnapshotRef.current
     if (prev === state) return
-    // Only snapshot when something other than `view` differs from prev.
-    const sameView = prev.view === state.view
-    const otherChanged =
+    // Snapshot when anything the user can perceive changed (view included:
+    // a camera move is undoable on purpose, but we skip pure no-op renders).
+    const changed =
+      prev.view !== state.view ||
       prev.theme !== state.theme ||
       prev.layers !== state.layers ||
       prev.title !== state.title ||
@@ -90,13 +103,14 @@ export function PosterProvider({
       prev.gpx !== state.gpx ||
       prev.layout !== state.layout ||
       prev.exportSettings !== state.exportSettings
-    if (otherChanged || !sameView) {
+    if (changed) {
       undoRef.current.push(prev)
       if (undoRef.current.length > HISTORY_LIMIT) undoRef.current.shift()
       redoRef.current = []
     }
     lastSnapshotRef.current = state
-  }, [state])
+    syncDepths()
+  }, [state, syncDepths])
 
   const undo = useCallback(() => {
     const prev = undoRef.current.pop()
@@ -104,13 +118,7 @@ export function PosterProvider({
     redoRef.current.push(lastSnapshotRef.current)
     if (redoRef.current.length > HISTORY_LIMIT) redoRef.current.shift()
     isJumpingRef.current = true
-    // Replace state via a synthetic RESET-like dispatch: reducer doesn't have
-    // a SET_ALL action, so we bypass by splicing the reducer's state through
-    // a custom action. Simplest: dispatch resets then re-apply via setState.
-    // We use the trick of dispatching RESET then quickly bringing the prev
-    // back using a private __SET marker would be ugly. Instead, replace via
-    // window event handled below.
-    window.dispatchEvent(new CustomEvent('mtp:set-state', { detail: prev }))
+    dispatch({ type: 'HYDRATE', state: prev })
   }, [])
 
   const redo = useCallback(() => {
@@ -119,38 +127,30 @@ export function PosterProvider({
     undoRef.current.push(lastSnapshotRef.current)
     if (undoRef.current.length > HISTORY_LIMIT) undoRef.current.shift()
     isJumpingRef.current = true
-    window.dispatchEvent(new CustomEvent('mtp:set-state', { detail: next }))
+    dispatch({ type: 'HYDRATE', state: next })
   }, [])
 
-  // Listen for the synthetic state replacement event and dispatch a RESET
-  // followed by per-field SETs to reconstruct. (Simpler alternative below.)
-  useEffect(() => {
-    function onSet(e: Event) {
-      const target = (e as CustomEvent<PosterState>).detail
-      if (!target) return
-      // Reducer route: dispatch a special hydration action handled below.
-      dispatch({ type: 'HYDRATE', state: target } as unknown as PosterAction)
-    }
-    window.addEventListener('mtp:set-state', onSet)
-    return () => window.removeEventListener('mtp:set-state', onSet)
-  }, [])
-
-  // Keyboard shortcuts: Cmd/Ctrl-Z, Cmd/Ctrl-Shift-Z (or Y).
+  // Keyboard shortcuts: Cmd/Ctrl-Z, Cmd/Ctrl-Shift-Z (or Cmd/Ctrl-Y).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey
-      if (!meta) return
+      if (!meta || e.altKey) return
       const target = e.target as HTMLElement | null
       if (
         target &&
-        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
       ) {
         return
       }
-      if (e.key === 'z' && !e.shiftKey) {
+      // Shift+Z reports `key === 'Z'`; normalise so ⇧⌘Z actually redoes.
+      const key = e.key.toLowerCase()
+      if (key === 'z' && !e.shiftKey) {
         e.preventDefault()
         undo()
-      } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
         e.preventDefault()
         redo()
       }
@@ -159,8 +159,8 @@ export function PosterProvider({
     return () => window.removeEventListener('keydown', onKey)
   }, [undo, redo])
 
-  const canUndo = undoRef.current.length > 0
-  const canRedo = redoRef.current.length > 0
+  const canUndo = depths.undo > 0
+  const canRedo = depths.redo > 0
   const value = useMemo(
     () => ({ state, dispatch, undo, redo, canUndo, canRedo }),
     [state, undo, redo, canUndo, canRedo],

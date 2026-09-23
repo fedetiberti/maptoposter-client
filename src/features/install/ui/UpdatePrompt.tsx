@@ -1,43 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RefreshCw, X } from 'lucide-react'
+import { registerSW } from 'virtual:pwa-register'
 
 /**
- * Service-worker update prompt. Lazy-imports the registerSW helper so this
- * file is safe to bundle even when virtual:pwa-register isn't available
- * (e.g., dev mode without the PWA plugin).
+ * Service-worker update prompt. `virtual:pwa-register` is provided by
+ * vite-plugin-pwa in both dev (no-op) and production builds, so it must be a
+ * static import — a dynamic `import('virtual:…')` survives into the bundle
+ * and the browser then tries to fetch that literal URL.
  */
 export function UpdatePrompt() {
   const [needRefresh, setNeedRefresh] = useState(false)
-  const [updateSW, setUpdateSW] = useState<((reload?: boolean) => Promise<void>) | null>(
-    null,
-  )
+  const updateRef = useRef<((reload?: boolean) => Promise<void>) | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      try {
-        const mod = await import(/* @vite-ignore */ 'virtual:pwa-register')
-        if (cancelled) return
-        const fn = mod.registerSW({
-          immediate: true,
-          onNeedRefresh() {
-            if (!cancelled) setNeedRefresh(true)
-          },
-        }) as (reload?: boolean) => Promise<void>
-        setUpdateSW(() => fn)
-      } catch {
-        // Plugin not active; ignore.
-      }
-    })()
+    try {
+      updateRef.current = registerSW({
+        immediate: true,
+        onNeedRefresh() {
+          if (!cancelled) setNeedRefresh(true)
+        },
+      })
+    } catch {
+      // Service workers unavailable (e.g. insecure context); ignore.
+    }
     return () => {
       cancelled = true
     }
   }, [])
 
-  if (!needRefresh || !updateSW) return null
+  if (!needRefresh) return null
   return (
     <div className="pointer-events-auto absolute bottom-20 left-3 z-30 max-w-[320px]">
-      <div className="glass flex items-start gap-3 rounded-md p-3">
+      <div className="glass flex items-start gap-3 rounded-md p-3" role="status">
         <RefreshCw size={16} className="mt-0.5 text-[var(--brass)]" />
         <div className="flex-1">
           <div className="readout text-[10.5px] uppercase tracking-[0.18em] text-foreground/90">
@@ -49,7 +44,7 @@ export function UpdatePrompt() {
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"
-              onClick={() => updateSW(true)}
+              onClick={() => updateRef.current?.(true)}
               className="rounded px-2 py-1 text-[10.5px] uppercase tracking-[0.18em]"
               style={{ background: 'var(--brass)', color: 'oklch(0.18 0.02 60)' }}
             >

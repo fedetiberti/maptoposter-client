@@ -82,42 +82,45 @@ export function MarkerEditor() {
           const icon = icons.find((i) => i.id === m.iconId) ?? icons[0]
           const isActive = activeId === m.id
           return (
-            <li key={m.id}>
+            <li
+              key={m.id}
+              className={cn(
+                'flex items-center gap-1 rounded-md border pr-1 transition',
+                isActive
+                  ? 'border-foreground/80 bg-foreground/10'
+                  : 'border-border/40 bg-card/30 hover:bg-card/60',
+              )}
+            >
               <button
                 type="button"
                 onClick={() => setActiveId(isActive ? null : m.id)}
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-md border px-2 py-1.5 transition',
-                  isActive
-                    ? 'border-foreground/80 bg-foreground/10'
-                    : 'border-border/40 bg-card/30 hover:bg-card/60',
-                )}
+                aria-pressed={isActive}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span
-                  className="size-5 shrink-0"
+                  className="block size-5 shrink-0 [&>svg]:size-5"
                   style={{ color: m.color }}
                   dangerouslySetInnerHTML={{ __html: icon?.svg ?? '' }}
                 />
-                <span className="flex flex-1 flex-col items-start text-left">
+                <span className="flex min-w-0 flex-1 flex-col items-start">
                   <span className="text-[11px] text-foreground">
                     {icon?.name ?? m.iconId}
                   </span>
-                  <span className="font-mono text-[10px] text-muted-foreground">
+                  <span className="readout text-[10px] text-muted-foreground">
                     {m.lat.toFixed(4)}, {m.lon.toFixed(4)}
                   </span>
                 </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    dispatch({ type: 'REMOVE_MARKER', id: m.id })
-                    if (activeId === m.id) setActiveId(null)
-                  }}
-                  className="rounded p-1 text-muted-foreground hover:bg-card hover:text-destructive"
-                  aria-label="Remove marker"
-                >
-                  <Trash2 size={12} />
-                </button>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch({ type: 'REMOVE_MARKER', id: m.id })
+                  if (activeId === m.id) setActiveId(null)
+                }}
+                className="rounded p-1 text-muted-foreground hover:bg-card hover:text-destructive"
+                aria-label="Remove marker"
+              >
+                <Trash2 size={12} />
               </button>
             </li>
           )
@@ -142,8 +145,10 @@ export function MarkerEditor() {
                       patch: { iconId: i.id },
                     })
                   }
+                  aria-label={i.name}
+                  aria-pressed={active.iconId === i.id}
                   className={cn(
-                    'flex aspect-square items-center justify-center rounded-md border transition',
+                    'flex aspect-square items-center justify-center rounded-md border p-1.5 transition [&>svg]:size-full',
                     active.iconId === i.id
                       ? 'border-foreground/80 bg-foreground/10'
                       : 'border-border/40 bg-card/30 hover:bg-card/70',
@@ -228,8 +233,7 @@ export function MarkerEditor() {
                     className="flex items-center gap-2 rounded px-1 py-0.5"
                   >
                     <span
-                      className="size-4"
-                      style={{ color: 'currentColor' }}
+                      className="block size-4 [&>svg]:size-4"
                       dangerouslySetInnerHTML={{ __html: i.svg }}
                     />
                     <span className="flex-1 truncate text-[10px]">{i.name}</span>

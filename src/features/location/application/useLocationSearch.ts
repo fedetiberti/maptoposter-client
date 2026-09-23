@@ -12,52 +12,57 @@ interface UseLocationSearchResult {
   reset: () => void
 }
 
+interface Settled {
+  query: string
+  results: Place[]
+  error: string | null
+}
+
 export function useLocationSearch(): UseLocationSearchResult {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<Place[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // The last query that produced a response (success or failure). Everything
+  // else — `loading`, the visible results — is derived from comparing it with
+  // the debounced query, so no state is written synchronously inside effects.
+  const [settled, setSettled] = useState<Settled>({ query: '', results: [], error: null })
   const debouncedQuery = useDebouncedValue(query, 350)
   const abortRef = useRef<AbortController | null>(null)
 
+  const trimmed = debouncedQuery.trim()
+  const active = trimmed.length >= 2
+
   useEffect(() => {
     abortRef.current?.abort()
-    const trimmed = debouncedQuery.trim()
-    if (trimmed.length < 2) {
-      setResults([])
-      setLoading(false)
-      setError(null)
-      return
-    }
+    if (!active) return
     const ctrl = new AbortController()
     abortRef.current = ctrl
-    setLoading(true)
-    setError(null)
     services.nominatim
       .search(trimmed, { signal: ctrl.signal })
       .then((places) => {
         if (ctrl.signal.aborted) return
-        setResults(places)
-        setLoading(false)
+        setSettled({ query: trimmed, results: places, error: null })
       })
       .catch((e: unknown) => {
         if (ctrl.signal.aborted) return
-        setError(e instanceof Error ? e.message : 'Search failed')
-        setLoading(false)
+        setSettled({
+          query: trimmed,
+          results: [],
+          error: e instanceof Error ? e.message : 'Search failed',
+        })
       })
     return () => ctrl.abort()
-  }, [debouncedQuery])
+  }, [trimmed, active])
 
+  const isCurrent = settled.query === trimmed
   return {
     query,
     setQuery,
-    results,
-    loading,
-    error,
+    results: active && isCurrent ? settled.results : [],
+    loading: active && !isCurrent,
+    error: active && isCurrent ? settled.error : null,
     reset: () => {
+      abortRef.current?.abort()
       setQuery('')
-      setResults([])
-      setError(null)
+      setSettled({ query: '', results: [], error: null })
     },
   }
 }

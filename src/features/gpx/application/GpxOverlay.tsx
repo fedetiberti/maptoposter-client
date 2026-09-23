@@ -1,5 +1,10 @@
 import { useEffect } from 'react'
+import type { ExpressionSpecification } from 'maplibre-gl'
 import type { MapEngine } from '@/features/map/infrastructure/MapEngine'
+import {
+  GPX_LINE_OPACITY,
+  gpxLineWidthExpression,
+} from '@/features/gpx/domain/gpxStyle'
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { usePosterState } from '@/features/poster/application/PosterContext'
@@ -40,15 +45,8 @@ export function GpxOverlay({ engine }: { engine: MapEngine | null }) {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': color,
-          'line-width': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            8, 1.5,
-            14, 3,
-            18, 6,
-          ],
-          'line-opacity': 0.95,
+          'line-width': gpxLineWidthExpression() as ExpressionSpecification,
+          'line-opacity': GPX_LINE_OPACITY,
         },
       })
     }

@@ -1,8 +1,6 @@
 import LZString from 'lz-string'
-import {
-  DEFAULT_POSTER_STATE,
-  type PosterState,
-} from '@/features/poster/domain/PosterState'
+import type { PosterState } from '@/features/poster/domain/PosterState'
+import { sanitizePosterState } from '@/features/poster/domain/sanitizeState'
 
 const HASH_PREFIX = '#s='
 
@@ -26,8 +24,7 @@ export function decodeShare(encoded: string): PosterState | null {
   try {
     const raw = LZString.decompressFromEncodedURIComponent(encoded)
     if (!raw) return null
-    const payload = JSON.parse(raw) as Partial<PosterState> & { v?: number }
-    return { ...DEFAULT_POSTER_STATE, ...payload, gpx: null }
+    return sanitizePosterState(JSON.parse(raw))
   } catch {
     return null
   }

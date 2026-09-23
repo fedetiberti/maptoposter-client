@@ -1,7 +1,5 @@
-import {
-  DEFAULT_POSTER_STATE,
-  type PosterState,
-} from '@/features/poster/domain/PosterState'
+import type { PosterState } from '@/features/poster/domain/PosterState'
+import { sanitizePosterState } from '@/features/poster/domain/sanitizeState'
 
 const KEY = 'mtp.poster.state.v1'
 
@@ -14,9 +12,7 @@ export function loadPersistedState(): PosterState | null {
   try {
     const raw = window.localStorage.getItem(KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<PosterState>
-    // Best-effort merge with defaults so missing fields backfill on schema growth.
-    return { ...DEFAULT_POSTER_STATE, ...parsed }
+    return sanitizePosterState(JSON.parse(raw))
   } catch {
     return null
   }
@@ -30,12 +26,13 @@ export function persistState(state: PosterState, debounceMs = 500): void {
     try {
       window.localStorage.setItem(KEY, JSON.stringify(shrinkForStorage(state)))
     } catch {
-      // ignore quota
+      // ignore quota / private mode
     }
   }, debounceMs)
 }
 
 export function clearPersistedState(): void {
+  if (saveTimer) window.clearTimeout(saveTimer)
   try {
     window.localStorage.removeItem(KEY)
   } catch {

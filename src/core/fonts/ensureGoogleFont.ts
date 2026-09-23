@@ -7,7 +7,7 @@
 const loaded = new Set<string>()
 const inFlight = new Map<string, Promise<void>>()
 
-function injectStylesheet(family: string, weights: number[]): HTMLLinkElement {
+function injectStylesheet(family: string, weights: readonly number[]): HTMLLinkElement {
   const id = `gfont-${family.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const existing = document.getElementById(id) as HTMLLinkElement | null
   if (existing) return existing
@@ -35,7 +35,7 @@ export function isFontLoaded(family: string, weight: number): boolean {
 
 export async function ensureGoogleFont(
   family: string,
-  weights: number[] = [400, 700],
+  weights: readonly number[] = [400, 700],
 ): Promise<void> {
   const key = `${family}|${weights.join(',')}`
   if (loaded.has(key)) return
@@ -65,12 +65,15 @@ export async function ensureGoogleFont(
 export async function ensureFontReady(
   cssFamily: string,
   googleFamily: string | null,
-  weight: number,
+  weights: readonly number[],
 ): Promise<void> {
+  const list = [...new Set(weights)]
   if (googleFamily) {
-    await ensureGoogleFont(googleFamily, [weight])
+    await ensureGoogleFont(googleFamily, list)
   }
   // For bundled fonts, just await the FontFaceSet ready signal.
-  await document.fonts.load(`${weight} 16px "${cssFamily}"`).catch(() => undefined)
+  await Promise.all(
+    list.map((w) => document.fonts.load(`${w} 16px "${cssFamily}"`).catch(() => undefined)),
+  )
   await document.fonts.ready
 }

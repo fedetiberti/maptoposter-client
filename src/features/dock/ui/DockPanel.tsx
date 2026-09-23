@@ -22,7 +22,7 @@ export function DockPanel({ id, children }: DockPanelProps) {
       key={id}
       role="region"
       aria-label={tab.label}
-      className="anim-panel-in glass pointer-events-auto absolute right-[60px] top-3 z-30 flex max-h-[calc(100vh-72px)] w-[360px] flex-col gap-3 overflow-hidden rounded-l-xl rounded-r-md p-4"
+      className="anim-panel-in glass pointer-events-auto absolute right-[60px] top-3 z-30 flex max-h-[calc(100dvh-72px)] w-[min(360px,calc(100vw-72px))] flex-col gap-3 overflow-hidden rounded-l-xl rounded-r-md p-4"
     >
       <header className="flex items-center justify-between gap-2 pb-1">
         <div className="flex flex-col gap-0.5">

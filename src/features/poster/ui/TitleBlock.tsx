@@ -1,7 +1,15 @@
-import { computeTitleFontSizes, formatCoords } from '@/features/poster/domain/textLayout'
+import { useEffect } from 'react'
+import { services } from '@/core/services'
+import {
+  computeTitleFontSizes,
+  formatCoords,
+  resolveTitleWeights,
+  TITLE_BLOCK,
+} from '@/features/poster/domain/textLayout'
 import { findTheme, THEMES } from '@/data/themes'
 import { resolveTheme } from '@/features/theme/domain/Theme'
 import { usePosterState } from '@/features/poster/application/PosterContext'
+import { useFrameCenter } from '@/features/poster/application/useFrameCenter'
 import { findFont } from '@/data/fonts'
 
 interface TitleBlockProps {
@@ -9,115 +17,101 @@ interface TitleBlockProps {
   width: number
   /** Height in CSS px of the poster preview area. */
   height: number
-  /** Optional override poster width for export-time rendering (skip layout scaling). */
-  exportWidthPx?: number
 }
 
 /**
  * Renders the four-line title block (city / divider / country / coords).
- * In preview mode, font sizes are computed from the on-screen poster width.
- * In export mode, pass the full export pixel width via `exportWidthPx`.
+ * Font sizes are computed from the on-screen poster box with exactly the same
+ * domain function the export compositor uses, so preview and print agree.
  */
-export function TitleBlock({ width, height, exportWidthPx }: TitleBlockProps) {
-  const { title, view, theme: themeSel, font } = usePosterState()
+export function TitleBlock({ width, height }: TitleBlockProps) {
+  const { title, theme: themeSel, font } = usePosterState()
+  const center = useFrameCenter()
+
+  // Make sure the selected family is actually loaded (Google Fonts are lazy),
+  // including on first boot from a persisted / shared state.
+  useEffect(() => {
+    services.fonts.ensureLoaded(font.id).catch(() => undefined)
+  }, [font.id])
+
   const fallback = THEMES[0]
   if (!fallback) return null
   const theme = findTheme(themeSel.id) ?? fallback
   const colors = resolveTheme(theme, themeSel.overrides)
 
-  const referenceWidth = exportWidthPx ?? width
   const city = (title.cityLabel ?? title.city ?? '').toUpperCase()
   const country = (title.countryLabel ?? title.country ?? '').toUpperCase()
-  const fontSizes = computeTitleFontSizes(referenceWidth, city.length)
-
-  // Convert to CSS px from export px (for preview).
-  const previewScale = width / referenceWidth
-  const cityFontPx = fontSizes.city * previewScale
-  const countryFontPx = fontSizes.country * previewScale
-  const coordsFontPx = fontSizes.coords * previewScale
-  const dividerWidthPx = fontSizes.divider.widthPx * previewScale
-  const dividerStrokePx = Math.max(1, fontSizes.divider.strokePx * previewScale)
+  const fontSizes = computeTitleFontSizes(width, height, city.length)
 
   const fontDef = findFont(font.id)
   const fontFamily = `"${fontDef?.cssFamily ?? font.googleFamily ?? 'Inter Variable'}", system-ui, sans-serif`
+  const weights = resolveTitleWeights(fontDef?.weights ?? [font.weight], font.weight)
+
+  // CSS letter-spacing adds a trailing gap after the last glyph, which would
+  // shift the visible ink left of centre; pad the same amount on the left so
+  // the ink itself is centred (the export compositor does the equivalent).
+  const line = (top: number, fontPx: number, spacingEm: number): React.CSSProperties => ({
+    position: 'absolute',
+    top: `${top * 100}%`,
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    fontFamily,
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    fontSize: `${fontPx}px`,
+    letterSpacing: `${spacingEm}em`,
+    paddingLeft: `${spacingEm}em`,
+  })
 
   return (
     <div
-      className="pointer-events-none absolute left-0 right-0 flex flex-col items-center"
-      style={{ bottom: 0, color: colors['ui.text'] }}
+      className="pointer-events-none absolute inset-0"
+      style={{ color: colors['ui.text'] }}
+      data-testid="title-block"
     >
-      {/* City */}
       <div
         style={{
-          position: 'absolute',
-          top: `${100 * 0.845}%`,
-          transform: 'translate(-50%, -50%)',
-          left: '50%',
-          fontFamily,
-          fontSize: `${cityFontPx}px`,
-          letterSpacing: '0.18em',
-          fontWeight: 700,
-          lineHeight: 1,
-          whiteSpace: 'nowrap',
+          ...line(TITLE_BLOCK.cityYRatio, fontSizes.city, TITLE_BLOCK.cityLetterSpacingEm),
+          fontWeight: weights.city,
         }}
       >
         {city || '—'}
       </div>
 
-      {/* Divider */}
       <div
         style={{
           position: 'absolute',
-          top: `${100 * 0.875}%`,
-          transform: 'translate(-50%, -50%)',
+          top: `${TITLE_BLOCK.dividerYRatio * 100}%`,
           left: '50%',
-          width: `${dividerWidthPx}px`,
-          height: `${dividerStrokePx}px`,
+          transform: 'translate(-50%, -50%)',
+          width: `${fontSizes.divider.widthPx}px`,
+          height: `${fontSizes.divider.strokePx}px`,
           background: colors['ui.text'],
           opacity: 0.7,
         }}
       />
 
-      {/* Country */}
       <div
         style={{
-          position: 'absolute',
-          top: `${100 * 0.905}%`,
-          transform: 'translate(-50%, -50%)',
-          left: '50%',
-          fontFamily,
-          fontSize: `${countryFontPx}px`,
-          letterSpacing: '0.32em',
-          fontWeight: 300,
+          ...line(TITLE_BLOCK.countryYRatio, fontSizes.country, TITLE_BLOCK.countryLetterSpacingEm),
+          fontWeight: weights.country,
           opacity: 0.85,
-          whiteSpace: 'nowrap',
         }}
       >
         {country || '—'}
       </div>
 
-      {/* Coords */}
       {title.showCoordinates && (
         <div
           style={{
-            position: 'absolute',
-            top: `${100 * 0.935}%`,
-            transform: 'translate(-50%, -50%)',
-            left: '50%',
-            fontFamily,
-            fontSize: `${coordsFontPx}px`,
-            letterSpacing: '0.18em',
-            fontWeight: 400,
+            ...line(TITLE_BLOCK.coordsYRatio, fontSizes.coords, TITLE_BLOCK.coordsLetterSpacingEm),
+            fontWeight: weights.coords,
             opacity: 0.6,
-            whiteSpace: 'nowrap',
           }}
         >
-          {formatCoords(view.lat, view.lon)}
+          {formatCoords(center.lat, center.lon)}
         </div>
       )}
-
-      <div style={{ height: `${height}px` }} />
     </div>
   )
 }
-

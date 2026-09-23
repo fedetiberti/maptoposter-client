@@ -10,6 +10,9 @@ export interface ICache {
 }
 
 export interface IFonts {
-  /** family is the FontDef id; weight is one of the family's declared weights. */
-  ensureLoaded(family: string, weight: number): Promise<void>
+  /**
+   * Resolve once the font is paint-ready. `fontId` is a FontDef id; `weights`
+   * defaults to every weight the family declares.
+   */
+  ensureLoaded(fontId: string, weights?: readonly number[]): Promise<void>
 }

@@ -1,78 +1,39 @@
-import { Download, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { Download, Loader2, X } from 'lucide-react'
 import { useDock } from '@/features/dock/application/DockContext'
-import {
-  usePosterState,
-} from '@/features/poster/application/PosterContext'
-import { useFramePresentation } from '@/features/poster/application/FramePresentationContext'
-import { runExport, type ExportProgress } from '@/features/export/application/exportPipeline'
-import { findLayout, LAYOUTS } from '@/data/layouts'
-import { exportSize } from '@/features/layout/domain/Layout'
+import { usePosterState } from '@/features/poster/application/PosterContext'
+import { useExportRunner } from '@/features/export/application/ExportRunnerContext'
+import { resolveExportSize } from '@/features/layout/application/resolveExportSize'
 
 /**
  * Bottom-right floating action button.
  * Single-tap exports in the user's last-chosen format.
- * Long-press / right-click opens the full Export panel in the dock.
+ * Right-click opens the full Export panel in the dock.
  */
 export function ExportFAB() {
   const state = usePosterState()
   const { open } = useDock()
-  const { viewportSize, previewBox } = useFramePresentation()
-  const [progress, setProgress] = useState<ExportProgress | null>(null)
-  const [exporting, setExporting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { exporting, progress, error, start, dismissError } = useExportRunner()
 
-  const dpi = state.layout.dpi
-  const layout =
-    state.layout.kind === 'preset' ? findLayout(state.layout.presetId) ?? LAYOUTS[3] : null
-  let widthPx = 0
-  let heightPx = 0
-  if (layout) {
-    const s = exportSize(layout, dpi)
-    widthPx = s.widthPx
-    heightPx = s.heightPx
-  } else if (state.layout.kind === 'custom') {
-    widthPx = state.layout.widthPx
-    heightPx = state.layout.heightPx
-  }
-  const mp = (widthPx * heightPx) / 1_000_000
-
-  async function quickExport(): Promise<void> {
-    setError(null)
-    if (!viewportSize || !previewBox) {
-      setError('Preview not ready — try again in a moment.')
-      return
-    }
-    setExporting(true)
-    setProgress({ stage: 'preparing', percent: 0 })
-    try {
-      await runExport(
-        {
-          state,
-          format: state.exportSettings.format,
-          liveViewportWidth: viewportSize.width,
-          liveViewportHeight: viewportSize.height,
-          previewBox,
-        },
-        (p) => setProgress(p),
-      )
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Export failed')
-    } finally {
-      setExporting(false)
-      window.setTimeout(() => setProgress(null), 1500)
-    }
-  }
-
+  const size = resolveExportSize(state.layout)
   const stage = progress?.stage
   const percent = progress?.percent ?? 0
 
   return (
-    <div className="pointer-events-auto absolute bottom-16 right-3 z-30 flex flex-col items-end gap-1.5">
+    <div className="pointer-events-auto absolute bottom-28 right-3 z-30 flex flex-col items-end gap-1.5 sm:bottom-20">
       {(exporting || error) && (
-        <div className="glass min-w-[220px] rounded-md px-3 py-2">
+        <div className="glass min-w-[220px] max-w-[320px] rounded-md px-3 py-2" role="status">
           {error ? (
-            <span className="text-[11px] text-destructive">{error}</span>
+            <div className="flex items-start gap-2">
+              <span className="flex-1 text-[11px] text-destructive">{error}</span>
+              <button
+                type="button"
+                onClick={dismissError}
+                aria-label="Dismiss"
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            </div>
           ) : (
             <>
               <div className="flex items-center justify-between text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -98,15 +59,15 @@ export function ExportFAB() {
       <button
         type="button"
         disabled={exporting}
-        onClick={quickExport}
+        onClick={start}
         onContextMenu={(e) => {
           e.preventDefault()
           open('export')
         }}
-        title={`Export as ${state.exportSettings.format.toUpperCase()} — ${widthPx}×${heightPx} (${mp.toFixed(
+        title={`Export as ${state.exportSettings.format.toUpperCase()} — ${size.widthPx}×${size.heightPx} (${size.megapixels.toFixed(
           1,
-        )} MP @ ${dpi} DPI). Right-click for options.`}
-        className="group relative inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-medium transition disabled:cursor-wait"
+        )} MP @ ${state.layout.dpi} DPI). Right-click for options.`}
+        className="group relative inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:cursor-wait"
         style={{
           background:
             'linear-gradient(180deg, oklch(0.86 0.16 75) 0%, oklch(0.78 0.16 70) 100%)',

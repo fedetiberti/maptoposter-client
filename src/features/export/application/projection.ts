@@ -46,6 +46,8 @@ export interface ExportProjection {
   centerLat: number
   centerLon: number
   zoom: number
+  /** Camera bearing in degrees (0 = north up). */
+  bearing: number
   exportWidthPx: number
   exportHeightPx: number
 }
@@ -57,28 +59,37 @@ export function lonLatToExportPx(
 ): { x: number; y: number } {
   const c = lonLatToWorldPx(proj.centerLon, proj.centerLat, proj.zoom)
   const p = lonLatToWorldPx(lng, lat, proj.zoom)
+  const wx = p.x - c.x
+  const wy = p.y - c.y
+  // Inverse of screenOffsetToLonLat's rotation: world → canvas.
+  const theta = (proj.bearing * Math.PI) / 180
+  const cos = Math.cos(theta)
+  const sin = Math.sin(theta)
   return {
-    x: proj.exportWidthPx / 2 + (p.x - c.x),
-    y: proj.exportHeightPx / 2 + (p.y - c.y),
+    x: proj.exportWidthPx / 2 + (cos * wx + sin * wy),
+    y: proj.exportHeightPx / 2 + (-sin * wx + cos * wy),
   }
 }
 
 /**
- * Compute the zoom level required so a viewport of `viewportWidthPx ×
- * viewportHeightPx` (in CSS pixels) shows the same geographic bounds as
- * an export of `exportWidthPx × exportHeightPx` would when rendered at
- * `viewZoom`. This lets us drive an offscreen MapLibre instance at any
- * pixel size while preserving the live preview's content.
+ * Convert a screen-pixel offset from the map's centre into the lon/lat under
+ * it, honouring the camera bearing (pitch is not supported by the poster
+ * camera, so a pure 2D rotation is exact).
  *
- * Derivation: at zoom z, 1 world-px = 1 screen-px. Halving viewport width
- * doubles the geographic span; we need to lower zoom by 1 for every 2x
- * smaller viewport.  Same for height. We pick the smaller adjustment so
- * the export contains *at least* what the live view shows.
+ * At zoom z one world-px equals one CSS px, so the screen offset is a
+ * world-px offset once un-rotated by the bearing: with bearing θ the map is
+ * rotated so that "up" on screen points θ degrees clockwise from north.
  */
-export function zoomForExport(
-  liveZoom: number,
-  liveViewportPx: number,
-  exportPx: number,
-): number {
-  return liveZoom + Math.log2(exportPx / liveViewportPx)
+export function screenOffsetToLonLat(
+  view: { lat: number; lon: number; zoom: number; bearing: number },
+  dx: number,
+  dy: number,
+): { lon: number; lat: number } {
+  const theta = (view.bearing * Math.PI) / 180
+  const cos = Math.cos(theta)
+  const sin = Math.sin(theta)
+  const wx = cos * dx - sin * dy
+  const wy = sin * dx + cos * dy
+  const c = lonLatToWorldPx(view.lon, view.lat, view.zoom)
+  return worldPxToLonLat(c.x + wx, c.y + wy, view.zoom)
 }

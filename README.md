@@ -1,20 +1,20 @@
 # maptoposter-client
 
-Print-grade map posters in your browser. A1 at 400 DPI, 35 themes, every layer customizable. No backend.
+Print-grade map posters in your browser. A1 at 400 DPI, 46 themes, every layer customizable. No backend.
 
 A client-side React + Vite SPA built on MapLibre GL and OpenFreeMap vector tiles. Sibling project to the original [maptoposter](https://github.com/fedetiberti/maptoposter) Python CLI / FastAPI app.
 
 ## Features
 
 - **Live interactive map preview** with bidirectional camera ↔ state sync
-- **35 themes** (18 ported from the original maptoposter, 17 originally encoded)
+- **46 themes** (18 ported from the original maptoposter, 17 originally encoded, 11 designed for this app)
 - **16 per-layer color overrides** via inline color pickers
 - **11 layer toggles** (buildings, water, parks, roads, etc.)
 - **Nominatim search** with debounced autocomplete + manual lat/lon entry that bypasses geocoding
 - **27 layout presets** (A1–A5 print, social, wallpaper, web) plus custom dimensions in px / cm / in
-- **DPI tabs** at 72 / 150 / 300 / 400, with **tile-render-and-stitch** for sizes that exceed a single GL canvas
+- **DPI tabs** at 72 / 150 / 300 / 400 (scale print sizes only; screen presets are fixed-pixel), with **tile-render-and-stitch** above 4096 px so MapLibre never downsamples the canvas
 - **Title block** with city / divider / country / coordinates and per-line label overrides
-- **Font picker** — 8 bundled `@fontsource` families plus ~50 curated Google Fonts loaded on demand
+- **Font picker** — 10 bundled `@fontsource` families plus ~50 curated Google Fonts loaded on demand (every weight the title block uses is preloaded before export)
 - **Marker system** — drag to place, 12 built-in icons, custom SVG upload (DOMPurify-sanitized) with monochrome tinting
 - **GPX track import** with haversine length readout
 - **PNG / PDF / SVG export** — PNG includes a hand-rolled `pHYs` chunk so print drivers see the right DPI; PDF is a hand-rolled minimal PDF 1.4

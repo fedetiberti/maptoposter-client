@@ -27,14 +27,14 @@ export class MapEngine {
       attributionControl: false,
       hash: false,
       fadeDuration: 200,
+      // Posters are flat: exports render at pitch 0, so never let the live
+      // camera tilt or the preview would show something the export can't.
+      maxPitch: 0,
+      pitchWithRotate: false,
+      touchPitch: false,
     })
-    this.map.addControl(
-      new maplibregl.AttributionControl({
-        compact: true,
-        customAttribution: '© OpenStreetMap · OpenFreeMap',
-      }),
-      'bottom-left',
-    )
+    // Attribution is rendered by the app's own status bar (with links), so the
+    // stock control — light-themed and overlapping the chrome — stays off.
     this.map.on('moveend', this.handleMoveEnd)
   }
 

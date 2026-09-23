@@ -14,11 +14,22 @@ export interface Layout {
   description?: string
 }
 
-/** Compute the export pixel size given a layout and a chosen DPI. */
+/** Whether the chosen DPI changes this layout's pixel size (print sizes only). */
+export function isDpiScalable(layout: Layout): boolean {
+  return layout.physical !== undefined
+}
+
+/**
+ * Compute the export pixel size given a layout and a chosen DPI.
+ *
+ * Only layouts with a physical size scale with DPI — a 1080×1080 Instagram
+ * post is a fixed pixel spec, so "300 DPI" must not turn it into 4500×4500.
+ */
 export function exportSize(layout: Layout, chosenDpi: number): {
   widthPx: number
   heightPx: number
 } {
+  if (!isDpiScalable(layout)) return { widthPx: layout.widthPx, heightPx: layout.heightPx }
   const scale = chosenDpi / layout.baseDpi
   return {
     widthPx: Math.round(layout.widthPx * scale),
@@ -30,11 +41,9 @@ export function aspectRatio(layout: Layout): number {
   return layout.widthPx / layout.heightPx
 }
 
-export function formatLayoutSize(layout: Layout, dpi: number): string {
-  const { widthPx, heightPx } = exportSize(layout, dpi)
-  if (layout.physical) {
-    const { w, h, unit } = layout.physical
-    return `${widthPx}×${heightPx} px · ${w}×${h} ${unit} @ ${dpi} DPI`
-  }
-  return `${widthPx}×${heightPx} px`
+/** Physical size in inches, when the layout has one. */
+export function physicalInches(layout: Layout): { w: number; h: number } | null {
+  if (!layout.physical) return null
+  const { w, h, unit } = layout.physical
+  return unit === 'in' ? { w, h } : { w: w / 25.4, h: h / 25.4 }
 }

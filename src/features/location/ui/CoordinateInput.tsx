@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   usePosterDispatch,
   usePosterState,
@@ -10,23 +10,32 @@ import { cn } from '@/lib/utils'
 export function CoordinateInput() {
   const state = usePosterState()
   const dispatch = usePosterDispatch()
-  const [lat, setLat] = useState(state.view.lat.toFixed(6))
-  const [lon, setLon] = useState(state.view.lon.toFixed(6))
-
-  // Keep inputs in sync with external view changes (search, drag, etc.).
-  useEffect(() => {
-    setLat(state.view.lat.toFixed(6))
-    setLon(state.view.lon.toFixed(6))
-  }, [state.view.lat, state.view.lon])
+  const externalLat = state.view.lat.toFixed(6)
+  const externalLon = state.view.lon.toFixed(6)
+  const [lat, setLat] = useState(externalLat)
+  const [lon, setLon] = useState(externalLon)
+  // Keep inputs in sync with external view changes (search, drag, etc.)
+  // using the "adjust state during render" pattern instead of an effect.
+  const [seen, setSeen] = useState({ lat: externalLat, lon: externalLon })
+  if (seen.lat !== externalLat || seen.lon !== externalLon) {
+    setSeen({ lat: externalLat, lon: externalLon })
+    setLat(externalLat)
+    setLon(externalLon)
+  }
 
   function commit(): void {
     const la = parseFloat(lat)
     const lo = parseFloat(lon)
-    if (!Number.isFinite(la) || !Number.isFinite(lo)) return
-    dispatch({
-      type: 'SET_VIEW',
-      view: { lat: clampLat(la), lon: clampLon(lo) },
-    })
+    if (!Number.isFinite(la) || !Number.isFinite(lo)) {
+      setLat(externalLat)
+      setLon(externalLon)
+      return
+    }
+    const next = { lat: clampLat(la), lon: clampLon(lo) }
+    setLat(next.lat.toFixed(6))
+    setLon(next.lon.toFixed(6))
+    if (next.lat.toFixed(6) === externalLat && next.lon.toFixed(6) === externalLon) return
+    dispatch({ type: 'SET_VIEW', view: next })
   }
 
   return (

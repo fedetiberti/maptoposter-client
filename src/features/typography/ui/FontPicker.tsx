@@ -21,12 +21,13 @@ export function FontPicker() {
   const [filter, setFilter] = useState<'bundled' | 'google' | 'all'>('all')
   const [query, setQuery] = useState('')
 
-  // Pre-load whatever's currently selected so the title block paints with the right family.
+  // Pre-load whatever's currently selected so the title block paints with the
+  // right family in every weight it uses (city / country / coords).
   useEffect(() => {
     const f = findFont(state.font.id)
     if (!f || f.source !== 'google' || !f.googleFamily) return
-    ensureGoogleFont(f.googleFamily, [state.font.weight]).catch(() => undefined)
-  }, [state.font.id, state.font.weight])
+    ensureGoogleFont(f.googleFamily, f.weights).catch(() => undefined)
+  }, [state.font.id])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

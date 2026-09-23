@@ -7,11 +7,11 @@ import { ensureFontReady } from '@/core/fonts/ensureGoogleFont'
 import { findFont } from '@/data/fonts'
 
 class FontsAdapter implements IFonts {
-  async ensureLoaded(family: string, weight: number): Promise<void> {
-    const font = findFont(family)
-    const cssFamily = font?.cssFamily ?? family
-    const googleFamily = font?.source === 'google' ? font.googleFamily ?? family : null
-    await ensureFontReady(cssFamily, googleFamily, weight)
+  async ensureLoaded(fontId: string, weights?: readonly number[]): Promise<void> {
+    const font = findFont(fontId)
+    const cssFamily = font?.cssFamily ?? fontId
+    const googleFamily = font?.source === 'google' ? font.googleFamily ?? fontId : null
+    await ensureFontReady(cssFamily, googleFamily, weights ?? font?.weights ?? [400, 700])
   }
 }
 

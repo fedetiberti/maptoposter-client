@@ -3,25 +3,28 @@
  *
  * Strategy:
  *   1. Tile the export rectangle into TILE_SIDE × TILE_SIDE chunks (with
- *      OVERLAP px overlap on internal edges).
+ *      OVERLAP px overlap on internal edges so anti-aliased line ends never
+ *      meet at a seam).
  *   2. Reuse a single offscreen MapLibre instance, panning the camera to
  *      each tile's center at zoom = exportZoom and rendering at the tile
  *      pixel size.
- *   3. blit each rendered tile onto a single 2D output canvas, omitting
+ *   3. Blit each rendered tile onto a single 2D output canvas, omitting
  *      the overlap region from the destination rect.
- *
- * Phase 9 stub kept for parity with the planned pipeline. For now this
- * reuses singlePass when the size fits, falling back to a multi-render
- * loop for larger sizes.
  */
 import maplibregl from 'maplibre-gl'
 import type { StyleSpecification } from 'maplibre-gl'
 import type { MapView } from '@/features/poster/domain/PosterState'
-import { lonLatToWorldPx, worldPxToLonLat } from '@/features/export/application/projection'
-import type { SinglePassResult } from '@/features/export/application/singlePass'
+import { screenOffsetToLonLat } from '@/features/export/application/projection'
+import {
+  stableLoaded,
+  waitForIdle,
+  type SinglePassResult,
+} from '@/features/export/application/singlePass'
 
-const TILE_SIDE = 4096
+/** Keep TILE_SIDE + 2·OVERLAP within MapLibre's safe 4096 px canvas. */
+const TILE_SIDE = 4000
 const OVERLAP = 32
+const MAX_RENDER_SIDE = TILE_SIDE + 2 * OVERLAP
 
 export interface TileRenderOpts {
   styleSpec: StyleSpecification
@@ -45,16 +48,21 @@ export async function renderTiled(opts: TileRenderOpts): Promise<SinglePassResul
   const outCtx = out.getContext('2d', { willReadFrequently: false })
   if (!outCtx) throw new Error('2D context unavailable')
 
-  // World-pixel rect of the entire export at exportZoom.
-  const centerWorld = lonLatToWorldPx(view.lon, view.lat, exportZoom)
-  const exportWorldX = centerWorld.x - widthPx / 2
-  const exportWorldY = centerWorld.y - heightPx / 2
+  // Tile centres are expressed as canvas-pixel offsets from the export centre
+  // and projected through the (possibly rotated) camera, so each tile renders
+  // with the real bearing and its pixels line up with the export axes.
+  const tileCenterLonLat = (canvasX: number, canvasY: number) =>
+    screenOffsetToLonLat(
+      { lat: view.lat, lon: view.lon, zoom: exportZoom, bearing: view.bearing },
+      canvasX - widthPx / 2,
+      canvasY - heightPx / 2,
+    )
 
   // Single offscreen MapLibre instance reused across tiles.
   const container = document.createElement('div')
   container.style.cssText = `
     position: absolute; left: -99999px; top: -99999px;
-    width: ${TILE_SIDE}px; height: ${TILE_SIDE}px; visibility: hidden;
+    width: ${Math.min(widthPx, MAX_RENDER_SIDE)}px; height: ${Math.min(heightPx, MAX_RENDER_SIDE)}px; visibility: hidden;
   `
   document.body.appendChild(container)
 
@@ -68,11 +76,13 @@ export async function renderTiled(opts: TileRenderOpts): Promise<SinglePassResul
     attributionControl: false,
     interactive: false,
     fadeDuration: 0,
+    pixelRatio: 1,
+    maxCanvasSize: [MAX_RENDER_SIDE, MAX_RENDER_SIDE],
     canvasContextAttributes: { preserveDrawingBuffer: true },
   })
 
   try {
-    await waitForLoaded(map)
+    await waitForIdle(map)
 
     let done = 0
     onTileProgress?.(0, totalTiles)
@@ -93,32 +103,27 @@ export async function renderTiled(opts: TileRenderOpts): Promise<SinglePassResul
         const renderW = innerW + padLeft + padRight
         const renderH = innerH + padTop + padBottom
 
-        // World-pixel center of the *render* rect.
-        const renderWorldX = exportWorldX + innerX - padLeft + renderW / 2
-        const renderWorldY = exportWorldY + innerY - padTop + renderH / 2
-        const center = worldPxToLonLat(renderWorldX, renderWorldY, exportZoom)
+        // Canvas-pixel center of the *render* rect.
+        const center = tileCenterLonLat(
+          innerX - padLeft + renderW / 2,
+          innerY - padTop + renderH / 2,
+        )
 
         container.style.width = `${renderW}px`
         container.style.height = `${renderH}px`
         map.resize()
-        map.jumpTo({ center: [center.lon, center.lat], zoom: exportZoom })
-        await waitForLoaded(map)
+        map.jumpTo({ center: [center.lon, center.lat], zoom: exportZoom, bearing: view.bearing })
+        await waitForIdle(map)
+        await stableLoaded(map)
 
         const glCanvas = map.getCanvas()
+        if (glCanvas.width !== renderW || glCanvas.height !== renderH) {
+          throw new Error(
+            `Renderer produced ${glCanvas.width}×${glCanvas.height} for a ${renderW}×${renderH} tile.`,
+          )
+        }
         // Source rect inside the render canvas excludes the overlap padding.
-        const srcX = padLeft
-        const srcY = padTop
-        outCtx.drawImage(
-          glCanvas,
-          srcX,
-          srcY,
-          innerW,
-          innerH,
-          innerX,
-          innerY,
-          innerW,
-          innerH,
-        )
+        outCtx.drawImage(glCanvas, padLeft, padTop, innerW, innerH, innerX, innerY, innerW, innerH)
         done += 1
         onTileProgress?.(done, totalTiles)
         // Yield to UI between tiles.
@@ -136,37 +141,4 @@ export async function renderTiled(opts: TileRenderOpts): Promise<SinglePassResul
     map.remove()
     container.remove()
   }
-}
-
-async function waitForLoaded(map: maplibregl.Map): Promise<void> {
-  await new Promise<void>((resolve) => {
-    if (map.loaded() && map.isStyleLoaded() && map.areTilesLoaded()) {
-      resolve()
-      return
-    }
-    const handler = () => {
-      if (map.loaded() && map.isStyleLoaded() && map.areTilesLoaded()) {
-        map.off('idle', handler)
-        resolve()
-      }
-    }
-    map.on('idle', handler)
-  })
-  // Stability: confirm twice 100ms apart.
-  let confirms = 0
-  await new Promise<void>((resolve) => {
-    const tick = () => {
-      if (map.areTilesLoaded()) {
-        confirms += 1
-        if (confirms >= 2) {
-          resolve()
-          return
-        }
-      } else {
-        confirms = 0
-      }
-      window.setTimeout(tick, 100)
-    }
-    tick()
-  })
 }

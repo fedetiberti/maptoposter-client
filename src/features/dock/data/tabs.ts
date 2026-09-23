@@ -10,6 +10,10 @@ import {
   Download,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
+import { THEMES } from '@/data/themes'
+import { LAYOUTS } from '@/data/layouts'
+import { FONTS } from '@/data/fonts'
+import { LAYER_TOGGLE_IDS, THEME_COLOR_KEYS } from '@/features/poster/domain/PosterState'
 
 export type DockTabId =
   | 'location'
@@ -34,29 +38,33 @@ export interface DockTab {
   Icon: ComponentType<IconProps>
 }
 
+const bundledFonts = FONTS.filter((f) => f.source === 'bundled').length
+const googleFonts = FONTS.length - bundledFonts
+
+/** Hints derive their numbers from the data tables so they can't drift. */
 export const DOCK_TABS: readonly DockTab[] = [
   {
     id: 'location',
     label: 'Location',
-    hint: 'Search a place or drop manual coordinates',
+    hint: 'Search a place or type coordinates · title block',
     Icon: Compass,
   },
   {
     id: 'layout',
     label: 'Layout',
-    hint: '27 presets · custom dimensions · DPI',
+    hint: `${LAYOUTS.length} presets · custom dimensions · DPI`,
     Icon: Frame,
   },
   {
     id: 'theme',
     label: 'Theme',
-    hint: '35 themes — pick your starting palette',
+    hint: `${THEMES.length} themes — pick your starting palette`,
     Icon: Palette,
   },
   {
     id: 'typography',
     label: 'Typography',
-    hint: 'Title-block font · 8 bundled + Google Fonts',
+    hint: `Title-block font · ${bundledFonts} bundled + ${googleFonts} Google Fonts`,
     Icon: Type,
   },
   {
@@ -74,13 +82,13 @@ export const DOCK_TABS: readonly DockTab[] = [
   {
     id: 'layers',
     label: 'Layers',
-    hint: '11 toggles for the OpenMapTiles layer set',
+    hint: `${LAYER_TOGGLE_IDS.length} toggles for the OpenMapTiles layer set`,
     Icon: LayersIcon,
   },
   {
     id: 'overrides',
     label: 'Colors',
-    hint: 'Override any of the 16 theme color keys',
+    hint: `Override any of the ${THEME_COLOR_KEYS.length} theme color keys`,
     Icon: Sliders,
   },
   {
