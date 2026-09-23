@@ -1,5 +1,6 @@
 import {
   DEFAULT_POSTER_STATE,
+  FADE_PERCENT_MAX,
   type PosterAction,
   type PosterState,
 } from '@/features/poster/domain/PosterState'
@@ -79,6 +80,12 @@ export function posterReducer(state: PosterState, action: PosterAction): PosterS
 
     case 'SET_REVERSE_GEOCODE_ON_PAN':
       return { ...state, reverseGeocodeOnPan: action.enabled }
+
+    case 'SET_FADE':
+      return {
+        ...state,
+        fadePercent: Math.min(FADE_PERCENT_MAX, Math.max(0, Math.round(action.percent))),
+      }
 
     case 'RESET':
       return DEFAULT_POSTER_STATE

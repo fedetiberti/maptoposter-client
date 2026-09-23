@@ -130,7 +130,15 @@ export interface PosterState {
   layout: LayoutSelection
   exportSettings: ExportSettings
   reverseGeocodeOnPan: boolean
+  /**
+   * Height of the top/bottom gradient fade bands as a percentage of the
+   * poster height (0 = no fade, 50 = the bands meet in the middle).
+   */
+  fadePercent: number
 }
+
+export const FADE_PERCENT_DEFAULT = 25
+export const FADE_PERCENT_MAX = 50
 
 export const DEFAULT_LAYER_TOGGLES: LayerToggles = {
   landcover: true,
@@ -184,6 +192,7 @@ export const DEFAULT_POSTER_STATE: PosterState = {
     showLabels: false,
   },
   reverseGeocodeOnPan: false,
+  fadePercent: FADE_PERCENT_DEFAULT,
 }
 
 export type PosterAction =
@@ -203,5 +212,6 @@ export type PosterAction =
   | { type: 'SET_LAYOUT'; layout: LayoutSelection }
   | { type: 'SET_EXPORT'; patch: Partial<ExportSettings> }
   | { type: 'SET_REVERSE_GEOCODE_ON_PAN'; enabled: boolean }
+  | { type: 'SET_FADE'; percent: number }
   | { type: 'RESET' }
   | { type: 'HYDRATE'; state: PosterState }

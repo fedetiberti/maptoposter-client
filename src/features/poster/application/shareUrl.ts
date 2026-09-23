@@ -16,6 +16,7 @@ export function encodeShare(state: PosterState): string {
     markers: state.markers,
     layout: state.layout,
     exportSettings: state.exportSettings,
+    fadePercent: state.fadePercent,
   }
   return LZString.compressToEncodedURIComponent(JSON.stringify(payload))
 }

@@ -3,6 +3,7 @@ import {
   usePosterState,
 } from '@/features/poster/application/PosterContext'
 import { cn } from '@/lib/utils'
+import { FADE_PERCENT_DEFAULT, FADE_PERCENT_MAX } from '@/features/poster/domain/PosterState'
 
 export function TitleControlPanel() {
   const state = usePosterState()
@@ -38,6 +39,60 @@ export function TitleControlPanel() {
           className="size-3.5 cursor-pointer accent-foreground"
         />
       </label>
+      <FadeSlider
+        value={state.fadePercent}
+        onChange={(percent) => dispatch({ type: 'SET_FADE', percent })}
+        onReset={() => dispatch({ type: 'SET_FADE', percent: FADE_PERCENT_DEFAULT })}
+      />
+    </div>
+  )
+}
+
+/** Height of the top/bottom fade bands, as a percentage of the poster height. */
+function FadeSlider({
+  value,
+  onChange,
+  onReset,
+}: {
+  value: number
+  onChange: (v: number) => void
+  onReset: () => void
+}) {
+  return (
+    <div className="rounded-md border border-border/40 bg-card/30 px-2.5 py-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <label htmlFor="fade-percent" className="text-[11px] text-foreground">
+          Edge fade
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="readout text-[10px] text-muted-foreground">
+            {value === 0 ? 'off' : `${value}%`}
+          </span>
+          {value !== FADE_PERCENT_DEFAULT && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+      <input
+        id="fade-percent"
+        type="range"
+        min={0}
+        max={FADE_PERCENT_MAX}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-valuetext={value === 0 ? 'off' : `${value}% of poster height`}
+        className="w-full accent-foreground"
+      />
+      <p className="mt-1 text-[10px] text-muted-foreground/70">
+        Gradient bands at the top and bottom, as a share of the poster height. 0 shows the map edge to edge.
+      </p>
     </div>
   )
 }

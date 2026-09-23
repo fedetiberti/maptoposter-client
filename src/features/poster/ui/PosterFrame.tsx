@@ -81,22 +81,27 @@ export function PosterFrame() {
             overflow: 'hidden',
           }}
         >
-          {/* Top + bottom gradient fades — match the original maptoposter:
-              25% bands fading linearly from theme bg at the edge to transparent. */}
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0"
-            style={{
-              height: '25%',
-              background: `linear-gradient(to bottom, ${colors['ui.bg']} 0%, transparent 100%)`,
-            }}
-          />
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0"
-            style={{
-              height: '25%',
-              background: `linear-gradient(to top, ${colors['ui.bg']} 0%, transparent 100%)`,
-            }}
-          />
+          {/* Top + bottom gradient fades: bands of `fadePercent` height fading
+              linearly from theme bg at the edge to transparent (25% matches the
+              original maptoposter; 0 disables them). */}
+          {state.fadePercent > 0 && (
+            <>
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0"
+                style={{
+                  height: `${state.fadePercent}%`,
+                  background: `linear-gradient(to bottom, ${colors['ui.bg']} 0%, transparent 100%)`,
+                }}
+              />
+              <div
+                className="pointer-events-none absolute inset-x-0 bottom-0"
+                style={{
+                  height: `${state.fadePercent}%`,
+                  background: `linear-gradient(to top, ${colors['ui.bg']} 0%, transparent 100%)`,
+                }}
+              />
+            </>
+          )}
           <TitleBlock width={previewBox.width} height={previewBox.height} />
         </div>
       )}

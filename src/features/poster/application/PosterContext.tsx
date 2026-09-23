@@ -102,7 +102,8 @@ export function PosterProvider({
       prev.markers !== state.markers ||
       prev.gpx !== state.gpx ||
       prev.layout !== state.layout ||
-      prev.exportSettings !== state.exportSettings
+      prev.exportSettings !== state.exportSettings ||
+      prev.fadePercent !== state.fadePercent
     if (changed) {
       undoRef.current.push(prev)
       if (undoRef.current.length > HISTORY_LIMIT) undoRef.current.shift()
@@ -135,15 +136,18 @@ export function PosterProvider({
     function onKey(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey
       if (!meta || e.altKey) return
+      // Leave text editing to the browser's own undo; sliders, checkboxes and
+      // radios have no native undo, so the app-level history applies there.
       const target = e.target as HTMLElement | null
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
-        return
+      if (target) {
+        const tag = target.tagName
+        const inputType = tag === 'INPUT' ? (target as HTMLInputElement).type : ''
+        const textLike =
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          target.isContentEditable ||
+          (tag === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'file'].includes(inputType))
+        if (textLike) return
       }
       // Shift+Z reports `key === 'Z'`; normalise so ⇧⌘Z actually redoes.
       const key = e.key.toLowerCase()

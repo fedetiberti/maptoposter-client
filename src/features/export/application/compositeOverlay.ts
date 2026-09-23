@@ -63,7 +63,7 @@ export async function compositeOverlay({
   // ── 3. Top + bottom gradient fades ─────────────────────────────────────
   // Mirrors the original maptoposter behavior: map shows through edge-to-edge,
   // fades into theme bg so the title block (and a subtle top strip) reads cleanly.
-  drawFades(ctx, themeColors['ui.bg'], W, H)
+  drawFades(ctx, themeColors['ui.bg'], W, H, state.fadePercent)
 
   // ── 4. Title block text ────────────────────────────────────────────────
   drawTitleBlock(ctx, state, themeColors, proj, W, H)
@@ -74,10 +74,15 @@ function drawFades(
   bgHex: string,
   W: number,
   H: number,
+  fadePercent: number,
 ): void {
-  // Match the original maptoposter: 25% bands at top and bottom, pure linear
-  // alpha ramp (1 at the edge → 0 at 25% in) in the theme bg color.
-  const topH = Math.round(H * 0.25)
+  // Bands of `fadePercent` height at top and bottom, pure linear alpha ramp
+  // (1 at the edge → 0 at the inner edge) in the theme bg color. Same
+  // geometry as the CSS gradients in PosterFrame.
+  if (fadePercent <= 0) return
+  const bandH = Math.round((H * fadePercent) / 100)
+  if (bandH <= 0) return
+  const topH = bandH
   const topGrad = ctx.createLinearGradient(0, 0, 0, topH)
   topGrad.addColorStop(0, bgHex)
   topGrad.addColorStop(1, rgbaWithAlpha(bgHex, 0))
@@ -86,7 +91,7 @@ function drawFades(
   ctx.fillRect(0, 0, W, topH)
   ctx.restore()
 
-  const botH = Math.round(H * 0.25)
+  const botH = bandH
   const botStartY = H - botH
   const botGrad = ctx.createLinearGradient(0, botStartY, 0, H)
   botGrad.addColorStop(0, rgbaWithAlpha(bgHex, 0))

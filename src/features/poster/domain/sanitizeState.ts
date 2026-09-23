@@ -1,5 +1,6 @@
 import {
   DEFAULT_POSTER_STATE,
+  FADE_PERCENT_MAX,
   LAYER_TOGGLE_IDS,
   THEME_COLOR_KEYS,
   type LayerToggles,
@@ -136,5 +137,6 @@ export function sanitizePosterState(raw: unknown): PosterState {
       showLabels: bool(exportSettings.showLabels, d.exportSettings.showLabels),
     },
     reverseGeocodeOnPan: bool(raw.reverseGeocodeOnPan, d.reverseGeocodeOnPan),
+    fadePercent: Math.round(num(raw.fadePercent, d.fadePercent, 0, FADE_PERCENT_MAX)),
   }
 }
